@@ -8,7 +8,7 @@ import { statsChart, download, helpCircle, checkmarkCircle, warning, construct, 
 import { useParams, useHistory } from 'react-router-dom';
 import { api } from '../App';
 
-interface Element {
+interface ScriptElement {
   id: string;
   type: string;
   content: string;
@@ -18,7 +18,7 @@ interface Script {
   id: string;
   title: string;
   type: string;
-  content: { elements: Element[]; titlePage?: any };
+  content: { elements: ScriptElement[]; titlePage?: any };
 }
 
 interface Issue {
@@ -103,7 +103,7 @@ export default function Editor() {
   const { id } = useParams<{ id: string }>();
   const history = useHistory();
   const [script, setScript] = useState<Script | null>(null);
-  const [elements, setElements] = useState<Element[]>([]);
+  const [elements, setElements] = useState<ScriptElement[]>([]);
   const [activeType, setActiveType] = useState('action');
   const [activeId, setActiveId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -117,7 +117,7 @@ export default function Editor() {
   const [exportFormat, setExportFormat] = useState('pdf');
   const [exporting, setExporting] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const paperRef = useRef<HTMLDivElement>(null);
+  const paperRef = useRef<HTMLDivScriptElement>(null);
 
   const getMode = (): string => {
     if (!script) return 'screenplay';
@@ -132,7 +132,7 @@ export default function Editor() {
   const helpContent = HELP_CONTENT[mode];
 
   useEffect(() => {
-    api<{ script: Script; content: { elements: Element[] } }>('/scripts/' + id).then(res => {
+    api<{ script: Script; content: { elements: ScriptElement[] } }>('/scripts/' + id).then(res => {
       if (res.script) {
         setScript(res.script);
         const els = res.content?.elements || [];
@@ -186,12 +186,12 @@ export default function Editor() {
     await api('/scripts/' + script.id, { method: 'PUT', body: { title } as any });
   };
 
-  const handleFocus = (el: Element) => { setActiveId(el.id); setActiveType(el.type); };
+  const handleFocus = (el: ScriptElement) => { setActiveId(el.id); setActiveType(el.type); };
 
-  const handleKeyDown = (e: React.KeyboardEvent, el: Element, index: number) => {
+  const handleKeyDown = (e: React.KeyboardEvent, el: ScriptElement, index: number) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      const newEl: Element = { id: genId(), type: NEXT_TYPE[el.type] || TYPES[0], content: '' };
+      const newEl: ScriptElement = { id: genId(), type: NEXT_TYPE[el.type] || TYPES[0], content: '' };
       const newEls = [...elements];
       newEls.splice(index + 1, 0, newEl);
       setElements(newEls);
@@ -299,7 +299,7 @@ export default function Editor() {
     clone.style.fontSize = '12pt';
     clone.style.lineHeight = mode === 'screenplay' ? '1' : '1.5';
 
-    clone.querySelectorAll('.el').forEach((el: Element) => {
+    clone.querySelectorAll('.el').forEach((el) => {
       const htmlEl = el as HTMLElement;
       htmlEl.style.color = 'black';
       htmlEl.style.background = 'transparent';
