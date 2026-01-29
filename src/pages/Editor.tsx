@@ -57,6 +57,7 @@ export default function Editor() {
   const saveTimer = useRef<any>(null);
   const paperRef = useRef<HTMLDivElement>(null);
 
+  // Load script
   useEffect(() => {
     api<{ script: Script; content: any }>('/scripts/' + id).then(res => {
       if (res.script) {
@@ -66,16 +67,33 @@ export default function Editor() {
     });
   }, [id]);
 
-  const markDirty = useCallback(() => {
-    setSaved(false);
-    clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => save(), 2000);
-  }, []);
+  // Autosave on page unload/refresh
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!saved) {
+        saveNow();
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [saved]);
 
-  const save = async () => {
-    if (!script) return;
+  // Autosave every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!saved && script) {
+        saveNow();
+      }
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [saved, script]);
+
+  const saveNow = async () => {
+    if (!script || !paperRef.current) return;
     setSaving(true);
-    const els = Array.from(paperRef.current?.querySelectorAll('.el') || []).map(el => ({
+    const els = Array.from(paperRef.current.querySelectorAll('.el')).map(el => ({
       id: el.getAttribute('data-id') || '',
       type: el.className.replace('el ', ''),
       content: el.textContent || ''
@@ -88,6 +106,12 @@ export default function Editor() {
     setSaving(false);
     setSaved(true);
   };
+
+  const markDirty = useCallback(() => {
+    setSaved(false);
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => saveNow(), 2000);
+  }, [script]);
 
   const updateTitle = async (title: string) => {
     if (!script) return;
@@ -132,7 +156,9 @@ export default function Editor() {
     }
   };
 
-  const handleToolbarTap = (type: string) => {
+  const handleToolbarTap = (type: string, e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     if (activeId) {
       changeType(activeId, type);
     }
@@ -153,7 +179,7 @@ export default function Editor() {
 
   const exportFountain = () => {
     setShowExport(false);
-    let text = '';
+    let text = 'Title: ' + (script?.title || 'Untitled') + '\n\n';
     elements.forEach(el => {
       if (el.type === 'scene-heading') text += '\n.' + el.content + '\n\n';
       else if (el.type === 'action') text += el.content + '\n\n';
@@ -167,7 +193,23 @@ export default function Editor() {
 
   const exportTxt = () => {
     setShowExport(false);
-    const text = elements.map(el => el.content).join('\n\n');
+    let text = (script?.title || 'Untitled').toUpperCase() + '\n\n';
+    text += '='.repeat(40) + '\n\n';
+    elements.forEach(el => {
+      if (el.type === 'scene-heading') {
+        text += '\n' + el.content + '\n\n';
+      } else if (el.type === 'action') {
+        text += el.content + '\n\n';
+      } else if (el.type === 'character') {
+        text += '\n' + ' '.repeat(20) + el.content + '\n';
+      } else if (el.type === 'dialogue') {
+        text += ' '.repeat(10) + el.content + '\n';
+      } else if (el.type === 'parenthetical') {
+        text += ' '.repeat(15) + '(' + el.content + ')\n';
+      } else if (el.type === 'transition') {
+        text += ' '.repeat(30) + el.content + '\n\n';
+      }
+    });
     downloadFile((script?.title || 'script') + '.txt', text);
   };
 
@@ -187,7 +229,7 @@ export default function Editor() {
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
-            <IonBackButton defaultHref="/dashboard" onClick={e => { e.preventDefault(); save().then(() => history.push('/dashboard')); }} />
+            <IonBackButton defaultHref="/dashboard" onClick={e => { e.preventDefault(); saveNow().then(() => history.push('/dashboard')); }} />
           </IonButtons>
           <IonTitle>
             <IonInput
@@ -234,16 +276,16 @@ export default function Editor() {
 
       <IonFooter>
         <IonToolbar>
-          <div style={{ display: 'flex', justifyContent: 'space-around', padding: '4px 0' }}>
+          <div className="toolbar-buttons">
             {TYPES.map(type => (
-              <IonButton
+              <button
                 key={type}
-                fill={activeType === type ? 'solid' : 'clear'}
-                size="small"
-                onClick={() => handleToolbarTap(type)}
+                className={'toolbar-btn' + (activeType === type ? ' active' : '')}
+                onTouchEnd={e => handleToolbarTap(type, e)}
+                onClick={e => handleToolbarTap(type, e)}
               >
                 {TYPE_LABELS[type]}
-              </IonButton>
+              </button>
             ))}
           </div>
         </IonToolbar>

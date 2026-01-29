@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonButton,
-  IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent,
   IonFab, IonFabButton, IonIcon, IonModal, IonItem, IonInput, IonSelect,
   IonSelectOption, IonList, IonAlert, IonRefresher, IonRefresherContent,
   IonPopover
 } from '@ionic/react';
-import { add, ellipsisVertical, person, shield } from 'ionicons/icons';
+import { add, person, shield, trash } from 'ionicons/icons';
 import { useHistory } from 'react-router-dom';
 import { useAuth, api } from '../App';
 
@@ -14,7 +13,13 @@ interface Script {
   id: string;
   title: string;
   type: string;
+  createdAt: string;
   updatedAt: string;
+}
+
+function formatDate(dateStr: string): string {
+  const date = new Date(dateStr);
+  return date.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 export default function Dashboard() {
@@ -23,7 +28,6 @@ export default function Dashboard() {
   const [newTitle, setNewTitle] = useState('');
   const [newType, setNewType] = useState('feature');
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [showMenu, setShowMenu] = useState(false);
   const { user, setUser } = useAuth();
   const history = useHistory();
 
@@ -101,20 +105,27 @@ export default function Dashboard() {
               <IonButton onClick={() => setShowNew(true)}>Create Your First Script</IonButton>
             </div>
           ) : (
-            scripts.map(script => (
-              <IonCard key={script.id} button onClick={() => history.push('/editor/' + script.id)}>
-                <IonCardHeader>
-                  <IonCardTitle>{script.title}</IonCardTitle>
-                  <IonCardSubtitle>{script.type}</IonCardSubtitle>
-                </IonCardHeader>
-                <IonCardContent>
-                  <IonButton fill="clear" size="small" color="danger"
-                    onClick={e => { e.stopPropagation(); setDeleteId(script.id); }}>
-                    Delete
-                  </IonButton>
-                </IonCardContent>
-              </IonCard>
-            ))
+            <div className="scripts-grid">
+              {scripts.map(script => (
+                <div key={script.id} className="script-card" onClick={() => history.push('/editor/' + script.id)}>
+                  <div className="script-card-top">
+                    <h3>{script.title}</h3>
+                  </div>
+                  <div className="script-card-bottom">
+                    <div className="script-dates">
+                      <span>Created: {formatDate(script.createdAt)}</span>
+                      <span>Edited: {formatDate(script.updatedAt)}</span>
+                    </div>
+                    <button 
+                      className="delete-btn"
+                      onClick={e => { e.stopPropagation(); setDeleteId(script.id); }}
+                    >
+                      <IonIcon icon={trash} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
 

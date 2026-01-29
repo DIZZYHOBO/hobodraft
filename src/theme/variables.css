@@ -29,6 +29,83 @@
   --ion-toolbar-background: #1a1a1e;
 }
 
+/* Script Cards Grid */
+.scripts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.script-card {
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+  height: 280px;
+}
+
+.script-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+}
+
+.script-card-top {
+  flex: 3;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.script-card-top h3 {
+  color: #1a1a1e;
+  font-size: 18px;
+  font-weight: 600;
+  text-align: center;
+  margin: 0;
+  word-break: break-word;
+}
+
+.script-card-bottom {
+  flex: 1;
+  background: #1a1a1e;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.script-dates {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.script-dates span {
+  font-size: 11px;
+  color: #a1a1a6;
+}
+
+.delete-btn {
+  background: transparent;
+  border: none;
+  color: #ef4444;
+  padding: 8px;
+  cursor: pointer;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.delete-btn:hover {
+  background: rgba(239, 68, 68, 0.1);
+}
+
 /* Editor wrapper - centers the paper */
 .editor-wrapper {
   display: flex;
@@ -68,18 +145,125 @@
 .el.parenthetical::after { content: ')'; }
 .el.transition { text-transform: uppercase; text-align: right; margin-top: 12px; }
 
+/* Toolbar Buttons */
+.toolbar-buttons {
+  display: flex;
+  justify-content: space-around;
+  padding: 8px 4px;
+  gap: 4px;
+}
+
+.toolbar-btn {
+  flex: 1;
+  padding: 12px 8px;
+  background: #242428;
+  border: none;
+  border-radius: 8px;
+  color: #a1a1a6;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.toolbar-btn:active {
+  background: var(--ion-color-primary);
+  color: white;
+}
+
+.toolbar-btn.active {
+  background: var(--ion-color-primary);
+  color: white;
+}
+
 @media (max-width: 576px) {
   .editor-wrapper { padding: 16px; }
   .paper { padding: 24px; min-height: auto; }
   .el.character { padding-left: 20%; }
   .el.dialogue { padding-left: 5%; padding-right: 5%; }
   .el.parenthetical { padding-left: 10%; padding-right: 10%; }
+  
+  .toolbar-btn {
+    padding: 14px 6px;
+    font-size: 12px;
+  }
+  
+  .scripts-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+  
+  .script-card {
+    height: 240px;
+  }
+  
+  .script-card-top h3 {
+    font-size: 16px;
+  }
 }
 
+/* Print Styles - Centered Output */
 @media print {
-  @page { size: letter; margin: 1in; }
-  body, ion-app, .editor-wrapper { background: white !important; }
-  .paper { background: white !important; color: black !important; padding: 0 !important; max-width: none !important; box-shadow: none !important; }
-  .el { color: black !important; background: none !important; }
-  ion-header, ion-footer, ion-tab-bar, ion-fab, ion-toolbar { display: none !important; }
+  @page { 
+    size: letter; 
+    margin: 1in; 
+  }
+  
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  body, ion-app, .editor-wrapper { 
+    background: white !important; 
+  }
+  
+  .paper { 
+    background: white !important; 
+    color: black !important; 
+    padding: 0 !important; 
+    max-width: none !important; 
+    box-shadow: none !important;
+    width: 100% !important;
+  }
+  
+  .el { 
+    color: black !important; 
+    background: none !important; 
+  }
+  
+  .el.scene-heading { 
+    text-transform: uppercase; 
+    font-weight: bold; 
+    margin-top: 24px; 
+  }
+  
+  .el.character { 
+    text-transform: uppercase; 
+    padding-left: 35%; 
+    margin-top: 12px; 
+  }
+  
+  .el.dialogue { 
+    padding-left: 15%; 
+    padding-right: 20%; 
+  }
+  
+  .el.parenthetical { 
+    padding-left: 25%; 
+    padding-right: 30%; 
+  }
+  
+  .el.transition { 
+    text-transform: uppercase; 
+    text-align: right; 
+    margin-top: 12px; 
+  }
+  
+  ion-header, ion-footer, ion-tab-bar, ion-fab, ion-toolbar, 
+  .toolbar-buttons, IonBackButton { 
+    display: none !important; 
+  }
 }
