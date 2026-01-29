@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonButton,
-  IonBackButton, IonIcon, IonFooter, IonModal, IonList, IonItem, IonLabel,
+  IonIcon, IonFooter, IonModal, IonList, IonItem, IonLabel,
   IonInput, IonNote, IonBadge, IonChip, IonRadioGroup, IonRadio
 } from '@ionic/react';
-import { statsChart, download, helpCircle, checkmarkCircle, warning, construct, locate, sparkles } from 'ionicons/icons';
+import { statsChart, download, helpCircle, checkmarkCircle, warning, construct, locate, sparkles, arrowBack } from 'ionicons/icons';
 import { useParams, useHistory } from 'react-router-dom';
 import { api } from '../App';
 
@@ -116,7 +116,7 @@ export default function Editor() {
   const [exportFilename, setExportFilename] = useState('');
   const [exportFormat, setExportFormat] = useState('pdf');
   const [exporting, setExporting] = useState(false);
-  const saveTimer = useRef<any>(null);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const paperRef = useRef<HTMLDivElement>(null);
 
   const getMode = (): string => {
@@ -132,7 +132,7 @@ export default function Editor() {
   const helpContent = HELP_CONTENT[mode];
 
   useEffect(() => {
-    api<{ script: Script; content: any }>('/scripts/' + id).then(res => {
+    api<{ script: Script; content: { elements: Element[] } }>('/scripts/' + id).then(res => {
       if (res.script) {
         setScript(res.script);
         const els = res.content?.elements || [];
@@ -156,7 +156,6 @@ export default function Editor() {
     return () => clearInterval(interval);
   }, [saved, script]);
 
-  // Update filename when title changes
   useEffect(() => {
     if (script?.title) setExportFilename(script.title);
   }, [script?.title]);
@@ -177,7 +176,7 @@ export default function Editor() {
 
   const markDirty = useCallback(() => {
     setSaved(false);
-    clearTimeout(saveTimer.current);
+    if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => saveNow(), 2000);
   }, [script]);
 
@@ -252,6 +251,11 @@ export default function Editor() {
     }, 300);
   };
 
+  const goBack = async () => {
+    await saveNow();
+    history.push('/dashboard');
+  };
+
   // ============================================
   // EXPORT FUNCTIONS
   // ============================================
@@ -276,7 +280,6 @@ export default function Editor() {
   };
 
   const exportPdf = async (filename: string) => {
-    // Dynamically import jspdf and html2canvas
     const [{ default: jsPDF }, { default: html2canvas }] = await Promise.all([
       import('jspdf'),
       import('html2canvas')
@@ -284,7 +287,6 @@ export default function Editor() {
 
     if (!paperRef.current) return;
 
-    // Create a clone for PDF generation (with print styles)
     const clone = paperRef.current.cloneNode(true) as HTMLElement;
     clone.style.position = 'absolute';
     clone.style.left = '-9999px';
@@ -297,13 +299,13 @@ export default function Editor() {
     clone.style.fontSize = '12pt';
     clone.style.lineHeight = mode === 'screenplay' ? '1' : '1.5';
 
-    // Style all elements for PDF
-    clone.querySelectorAll('.el').forEach((el: any) => {
-      el.style.color = 'black';
-      el.style.background = 'transparent';
-      el.style.outline = 'none';
-      el.style.border = 'none';
-      el.removeAttribute('contenteditable');
+    clone.querySelectorAll('.el').forEach((el: Element) => {
+      const htmlEl = el as HTMLElement;
+      htmlEl.style.color = 'black';
+      htmlEl.style.background = 'transparent';
+      htmlEl.style.outline = 'none';
+      htmlEl.style.border = 'none';
+      htmlEl.removeAttribute('contenteditable');
     });
 
     document.body.appendChild(clone);
@@ -604,7 +606,9 @@ export default function Editor() {
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
-            <IonBackButton defaultHref="/dashboard" onClick={e => { e.preventDefault(); saveNow().then(() => history.push('/dashboard')); }} />
+            <IonButton onClick={goBack}>
+              <IonIcon icon={arrowBack} />
+            </IonButton>
           </IonButtons>
           <IonTitle>
             <IonInput value={script.title} onIonChange={e => updateTitle(e.detail.value || '')} style={{ textAlign: 'center' }} />

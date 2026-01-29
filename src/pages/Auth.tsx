@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
-  IonPage, IonContent, IonCard, IonCardHeader, IonCardTitle, IonCardContent,
-  IonItem, IonInput, IonButton, IonSegment, IonSegmentButton, IonLabel,
-  IonText, IonNote
+  IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonCard, IonCardContent,
+  IonItem, IonInput, IonButton, IonSegment, IonSegmentButton, IonLabel
 } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
-import { useAuth, api } from '../App';
+import { api, useAuth } from '../App';
 
 export default function Auth() {
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -13,95 +12,77 @@ export default function Auth() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { setUser } = useAuth();
   const history = useHistory();
+  const { setUser } = useAuth();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-
-    try {
-      const endpoint = mode === 'login' ? '/auth/login' : '/auth/register';
-      const res = await api<{ error?: string; user?: any }>(endpoint, {
-        method: 'POST',
-        body: { username, password } as any
-      });
-
-      if (res.error) {
-        setError(res.error);
-      } else if (res.user) {
-        setUser(res.user);
-        history.replace('/dashboard');
-      }
-    } catch {
-      setError('Connection failed');
+  const handleSubmit = async () => {
+    if (!username || !password) {
+      setError('Please fill in all fields');
+      return;
     }
+    setLoading(true);
+    setError('');
+
+    const endpoint = mode === 'login' ? '/auth/login' : '/auth/register';
+    const res = await api<{ success?: boolean; user?: any; error?: string }>(endpoint, {
+      method: 'POST',
+      body: { username, password } as any
+    });
+
     setLoading(false);
+    if (res.success && res.user) {
+      setUser(res.user);
+      history.push('/dashboard');
+    } else {
+      setError(res.error || 'Something went wrong');
+    }
   };
 
   return (
     <IonPage>
+      <IonHeader>
+        <IonToolbar>
+          <IonTitle>HoboDraft</IonTitle>
+        </IonToolbar>
+      </IonHeader>
       <IonContent className="ion-padding">
-        <div style={{ maxWidth: 400, margin: '60px auto' }}>
-          <h1 style={{ textAlign: 'center', marginBottom: 24 }}>HoboDraft</h1>
-          
-          <IonSegment value={mode} onIonChange={e => setMode(e.detail.value as any)}>
-            <IonSegmentButton value="login">
-              <IonLabel>Sign In</IonLabel>
-            </IonSegmentButton>
-            <IonSegmentButton value="register">
-              <IonLabel>Register</IonLabel>
-            </IonSegmentButton>
+        <div style={{ maxWidth: 400, margin: '0 auto', paddingTop: 40 }}>
+          <h1 style={{ textAlign: 'center', marginBottom: 24 }}>✍️ HoboDraft</h1>
+          <p style={{ textAlign: 'center', color: '#888', marginBottom: 32 }}>
+            Professional screenwriting for everyone
+          </p>
+
+          <IonSegment value={mode} onIonChange={e => setMode(e.detail.value as 'login' | 'register')}>
+            <IonSegmentButton value="login"><IonLabel>Sign In</IonLabel></IonSegmentButton>
+            <IonSegmentButton value="register"><IonLabel>Sign Up</IonLabel></IonSegmentButton>
           </IonSegment>
 
-          <IonCard style={{ marginTop: 16 }}>
+          <IonCard style={{ marginTop: 24 }}>
             <IonCardContent>
-              <form onSubmit={handleSubmit}>
-                <IonItem>
-                  <IonInput
-                    label="Username"
-                    labelPlacement="floating"
-                    value={username}
-                    onIonInput={e => setUsername(e.detail.value || '')}
-                    required
-                    minlength={3}
-                  />
-                </IonItem>
-                
-                <IonItem>
-                  <IonInput
-                    label="Password"
-                    labelPlacement="floating"
-                    type="password"
-                    value={password}
-                    onIonInput={e => setPassword(e.detail.value || '')}
-                    required
-                    minlength={6}
-                  />
-                </IonItem>
+              <IonItem>
+                <IonInput
+                  label="Username"
+                  labelPlacement="stacked"
+                  value={username}
+                  onIonInput={e => setUsername(e.detail.value || '')}
+                  autocapitalize="off"
+                />
+              </IonItem>
+              <IonItem>
+                <IonInput
+                  label="Password"
+                  labelPlacement="stacked"
+                  type="password"
+                  value={password}
+                  onIonInput={e => setPassword(e.detail.value || '')}
+                />
+              </IonItem>
 
-                {error && (
-                  <IonText color="danger" style={{ display: 'block', padding: '8px 16px' }}>
-                    {error}
-                  </IonText>
-                )}
+              {error && <p style={{ color: 'var(--ion-color-danger)', padding: '16px 0 0', margin: 0 }}>{error}</p>}
 
-                <IonButton
-                  expand="block"
-                  type="submit"
-                  style={{ marginTop: 16 }}
-                  disabled={loading}
-                >
-                  {loading ? 'Please wait...' : mode === 'login' ? 'Sign In' : 'Register'}
-                </IonButton>
-
-                {mode === 'register' && (
-                  <IonNote style={{ display: 'block', textAlign: 'center', marginTop: 12 }}>
-                    First user becomes admin
-                  </IonNote>
-                )}
-              </form>
+              <IonButton expand="block" onClick={handleSubmit} disabled={loading} style={{ marginTop: 24 }}>
+                {loading ? 'Please wait...' : mode === 'login' ? 'Sign In' : 'Create Account'}
+              </IonButton>
             </IonCardContent>
           </IonCard>
         </div>
