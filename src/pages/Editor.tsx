@@ -117,7 +117,7 @@ export default function Editor() {
   const [exportFormat, setExportFormat] = useState('pdf');
   const [exporting, setExporting] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const paperRef = useRef<HTMLDivScriptElement>(null);
+  const paperRef = useRef<HTMLDivElement>(null);
 
   const getMode = (): string => {
     if (!script) return 'screenplay';
@@ -163,7 +163,7 @@ export default function Editor() {
   const saveNow = async () => {
     if (!script || !paperRef.current) return;
     setSaving(true);
-    const els = Array.from(paperRef.current.querySelectorAll('.el')).map(el => ({
+    const els = Array.from(paperRef.current.querySelectorAll('.el')).map((el: HTMLElement) => ({
       id: el.getAttribute('data-id') || '',
       type: el.className.replace('el ', '').split(' ')[0],
       content: el.textContent || ''
