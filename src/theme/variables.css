@@ -296,6 +296,52 @@
 .help-tips li strong { color: var(--ion-color-primary); font-weight: 600; }
 
 /* ============================================
+   EXPORT MODAL
+   ============================================ */
+
+.export-modal {
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.export-modal ion-item {
+  --background: #1a1a1e;
+  margin-bottom: 20px;
+  border-radius: 8px;
+}
+
+.export-format-section {
+  margin-top: 24px;
+}
+
+.export-format-section h3 {
+  font-size: 14px;
+  color: #a1a1a6;
+  margin: 0 0 12px 0;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.export-format-section ion-item {
+  --background: #1a1a1e;
+  margin-bottom: 8px;
+  border-radius: 8px;
+}
+
+.export-format-section ion-item h2 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #f5f5f7;
+  margin: 0 0 4px 0;
+}
+
+.export-format-section ion-item p {
+  font-size: 13px;
+  color: #8a8a8e;
+  margin: 0;
+}
+
+/* ============================================
    MOBILE RESPONSIVE
    ============================================ */
 

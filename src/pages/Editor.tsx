@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonButton,
   IonBackButton, IonIcon, IonFooter, IonModal, IonList, IonItem, IonLabel,
-  IonInput, IonNote, IonActionSheet, IonBadge, IonChip
+  IonInput, IonNote, IonBadge, IonChip, IonRadioGroup, IonRadio
 } from '@ionic/react';
 import { statsChart, download, helpCircle, checkmarkCircle, warning, construct, locate, sparkles } from 'ionicons/icons';
 import { useParams, useHistory } from 'react-router-dom';
@@ -113,7 +113,9 @@ export default function Editor() {
   const [showHelp, setShowHelp] = useState(false);
   const [showChecker, setShowChecker] = useState(false);
   const [issues, setIssues] = useState<Issue[]>([]);
-  const [checkerRan, setCheckerRan] = useState(false);
+  const [exportFilename, setExportFilename] = useState('');
+  const [exportFormat, setExportFormat] = useState('pdf');
+  const [exporting, setExporting] = useState(false);
   const saveTimer = useRef<any>(null);
   const paperRef = useRef<HTMLDivElement>(null);
 
@@ -136,6 +138,7 @@ export default function Editor() {
         const els = res.content?.elements || [];
         setElements(els);
         if (els.length > 0) setActiveType(els[0].type);
+        setExportFilename(res.script.title || 'Untitled');
       }
     });
   }, [id]);
@@ -152,6 +155,11 @@ export default function Editor() {
     const interval = setInterval(() => { if (!saved && script) saveNow(); }, 30000);
     return () => clearInterval(interval);
   }, [saved, script]);
+
+  // Update filename when title changes
+  useEffect(() => {
+    if (script?.title) setExportFilename(script.title);
+  }, [script?.title]);
 
   const saveNow = async () => {
     if (!script || !paperRef.current) return;
@@ -245,235 +253,104 @@ export default function Editor() {
   };
 
   // ============================================
-  // DOCUMENT CHECKER
+  // EXPORT FUNCTIONS
   // ============================================
-  
-  const runChecker = () => {
-    const foundIssues: Issue[] = [];
-    const els = [...elements];
-    
-    const addIssue = (
-      elementId: string, index: number, severity: 'warning' | 'suggestion',
-      title: string, detail: string, canAutoFix = false, fixLabel?: string, fixAction?: () => void
-    ) => {
-      foundIssues.push({ id: genId(), elementId, elementIndex: index, severity, title, detail, canAutoFix, fixLabel, fixAction });
-    };
 
-    // ========== SCREENPLAY CHECKS ==========
-    if (mode === 'screenplay') {
-      els.forEach((el, i) => {
-        const content = el.content.trim();
-        const upper = content.toUpperCase();
-        
-        // Empty element
-        if (!content) {
-          addIssue(el.id, i, 'suggestion', 'Empty element', `This ${TYPE_LABELS[el.type]} line is empty. Consider removing it.`, 
-            true, 'Remove', () => removeElement(el.id));
-        }
+  const doExport = async () => {
+    const filename = exportFilename.trim() || 'Untitled';
+    setExporting(true);
 
-        // Scene heading checks
-        if (el.type === 'scene-heading' && content) {
-          if (!upper.startsWith('INT.') && !upper.startsWith('EXT.') && !upper.startsWith('INT/EXT') && !upper.startsWith('I/E')) {
-            addIssue(el.id, i, 'warning', 'Scene heading format', 'Should start with INT. (interior) or EXT. (exterior).', 
-              true, 'Add INT.', () => updateElementContent(el.id, 'INT. ' + content));
-          }
-          if (!content.includes(' - ')) {
-            addIssue(el.id, i, 'suggestion', 'Missing time of day', 'Consider adding time of day (- DAY, - NIGHT, etc.)', 
-              true, 'Add "- DAY"', () => updateElementContent(el.id, content + ' - DAY'));
-          }
-        }
-
-        // Dialogue without character
-        if (el.type === 'dialogue' && i > 0 && content) {
-          const prev = els[i - 1];
-          if (prev.type !== 'character' && prev.type !== 'parenthetical' && prev.type !== 'dialogue') {
-            addIssue(el.id, i, 'warning', 'Orphan dialogue', 'Dialogue should follow a Character name or another dialogue line.', false);
-          }
-        }
-
-        // Parenthetical without dialogue
-        if (el.type === 'parenthetical' && content) {
-          const next = els[i + 1];
-          if (!next || next.type !== 'dialogue') {
-            addIssue(el.id, i, 'warning', 'Orphan parenthetical', 'Parenthetical should be followed by dialogue.', false);
-          }
-        }
-
-        // Long action
-        if (el.type === 'action' && content.length > 350) {
-          addIssue(el.id, i, 'suggestion', 'Long action block', 'Consider breaking this into shorter paragraphs (3-4 lines max) for easier reading.', false);
-        }
-
-        // Same character twice in a row
-        if (el.type === 'character' && content) {
-          for (let j = i - 1; j >= 0; j--) {
-            if (els[j].type === 'character') {
-              if (els[j].content.trim().toUpperCase() === upper) {
-                addIssue(el.id, i, 'suggestion', 'Same character speaks again', 'Consider adding action between speeches to show reactions or time passing.', false);
-              }
-              break;
-            }
-            if (els[j].type === 'action' || els[j].type === 'scene-heading') break;
-          }
-        }
-
-        // All caps dialogue (shouting?)
-        if (el.type === 'dialogue' && content.length > 15 && content === upper) {
-          addIssue(el.id, i, 'suggestion', 'All caps dialogue', 'ALL CAPS implies shouting. If intentional, great! Otherwise, use normal case.', false);
-        }
-      });
-
-      // Check starts with scene heading
-      if (els.length > 0 && els[0].type !== 'scene-heading') {
-        addIssue(els[0].id, 0, 'suggestion', 'Missing opening scene', 'Screenplays typically start with a Scene Heading (INT./EXT.)', false);
+    try {
+      if (exportFormat === 'pdf') {
+        await exportPdf(filename);
+      } else {
+        exportText(filename, exportFormat as 'fountain' | 'txt' | 'md');
       }
+    } catch (err) {
+      console.error('Export failed:', err);
+      alert('Export failed. Please try again.');
     }
 
-    // ========== POETRY CHECKS ==========
-    if (mode === 'poetry') {
-      let hasTitle = false;
-      let hasAttribution = false;
-      let consecutiveBreaks = 0;
-
-      els.forEach((el, i) => {
-        const content = el.content.trim();
-
-        if (el.type === 'poem-title') hasTitle = true;
-        if (el.type === 'attribution') hasAttribution = true;
-
-        // Empty verse
-        if ((el.type === 'verse' || el.type === 'verse-indent' || el.type === 'refrain') && !content) {
-          addIssue(el.id, i, 'suggestion', 'Empty line', 'This line is empty. Use a Stanza Break for intentional spacing.', 
-            true, 'Make Break', () => {
-              setElements(prev => prev.map(e => e.id === el.id ? { ...e, type: 'stanza-break', content: '' } : e));
-              markDirty();
-            });
-        }
-
-        // Very long line
-        if ((el.type === 'verse' || el.type === 'verse-indent') && content.length > 80) {
-          addIssue(el.id, i, 'suggestion', 'Long line', 'This line is quite long. Consider breaking it or using indented continuation.', false);
-        }
-
-        // Consecutive stanza breaks
-        if (el.type === 'stanza-break') {
-          consecutiveBreaks++;
-          if (consecutiveBreaks > 1) {
-            addIssue(el.id, i, 'suggestion', 'Multiple breaks', 'Multiple stanza breaks in a row. One is usually enough.', 
-              true, 'Remove', () => removeElement(el.id));
-          }
-        } else {
-          consecutiveBreaks = 0;
-        }
-
-        // Attribution not at end
-        if (el.type === 'attribution' && i < els.length - 1) {
-          const remaining = els.slice(i + 1).filter(e => e.content.trim());
-          if (remaining.length > 0) {
-            addIssue(el.id, i, 'suggestion', 'Attribution placement', 'Attribution usually appears at the very end of the poem.', false);
-          }
-        }
-      });
-
-      // Missing title
-      if (!hasTitle && els.length > 0) {
-        addIssue(els[0].id, 0, 'suggestion', 'No title', 'Consider adding a Title at the beginning of your poem.', false);
-      }
-    }
-
-    // ========== FICTION CHECKS ==========
-    if (mode === 'fiction') {
-      let hasChapter = false;
-      let consecutiveBreaks = 0;
-
-      els.forEach((el, i) => {
-        const content = el.content.trim();
-
-        if (el.type === 'chapter-heading') hasChapter = true;
-
-        // Empty body
-        if (el.type === 'body' && !content) {
-          addIssue(el.id, i, 'suggestion', 'Empty paragraph', 'This paragraph is empty.', 
-            true, 'Remove', () => removeElement(el.id));
-        }
-
-        // Very long paragraph
-        if (el.type === 'body' && content.split(/\s+/).length > 200) {
-          addIssue(el.id, i, 'suggestion', 'Long paragraph', 'This paragraph is quite long. Consider breaking it up for readability.', false);
-        }
-
-        // Dialogue formatting
-        if (el.type === 'dialogue' && content && !content.includes('"') && !content.includes("'")) {
-          // Content doesn't have quotes - that's fine, we add them, but check if it looks like narration
-          if (content.split(' ').length > 30) {
-            addIssue(el.id, i, 'suggestion', 'Long dialogue', 'This is quite a long speech. Consider breaking it up with action beats.', false);
-          }
-        }
-
-        // Thought that might be dialogue
-        if (el.type === 'thought' && content.startsWith('"')) {
-          addIssue(el.id, i, 'suggestion', 'Quoted thought?', 'This thought starts with a quote mark. Should it be Dialogue instead?', 
-            true, 'Make Dialogue', () => {
-              setElements(prev => prev.map(e => e.id === el.id ? { ...e, type: 'dialogue' } : e));
-              markDirty();
-            });
-        }
-
-        // Consecutive scene breaks
-        if (el.type === 'scene-break') {
-          consecutiveBreaks++;
-          if (consecutiveBreaks > 1) {
-            addIssue(el.id, i, 'suggestion', 'Multiple breaks', 'Multiple scene breaks in a row. One is usually enough.', 
-              true, 'Remove', () => removeElement(el.id));
-          }
-        } else {
-          consecutiveBreaks = 0;
-        }
-
-        // Chapter with no content after
-        if (el.type === 'chapter-heading') {
-          const next = els[i + 1];
-          if (!next || next.type === 'chapter-heading' || next.type === 'section-header') {
-            addIssue(el.id, i, 'warning', 'Empty chapter', 'This chapter has no content after it.', false);
-          }
-        }
-      });
-
-      // No chapter heading
-      if (!hasChapter && els.length > 3) {
-        addIssue(els[0].id, 0, 'suggestion', 'No chapter heading', 'Consider starting with a Chapter Heading to organize your story.', false);
-      }
-    }
-
-    setIssues(foundIssues);
-    setCheckerRan(true);
-    setShowChecker(true);
-  };
-
-  const getStats = () => {
-    let words = 0, scenes = 0, stanzas = 0, chapters = 0;
-    const chars = new Set<string>();
-    elements.forEach(el => {
-      words += (el.content || '').split(/\s+/).filter(Boolean).length;
-      if (el.type === 'scene-heading') scenes++;
-      if (el.type === 'character' && el.content) chars.add(el.content.toUpperCase());
-      if (el.type === 'stanza-break' || el.type === 'poem-title') stanzas++;
-      if (el.type === 'chapter-heading') chapters++;
-    });
-    return { pages: Math.max(1, Math.ceil(elements.length / 55)), scenes, words, characters: chars.size, stanzas, chapters,
-      lines: elements.filter(e => e.type === 'verse' || e.type === 'verse-indent' || e.type === 'refrain').length };
-  };
-
-  const exportPdf = () => { setShowExport(false); window.print(); };
-
-  const exportFile = (format: 'fountain' | 'txt' | 'md') => {
+    setExporting(false);
     setShowExport(false);
+  };
+
+  const exportPdf = async (filename: string) => {
+    // Dynamically import jspdf and html2canvas
+    const [{ default: jsPDF }, { default: html2canvas }] = await Promise.all([
+      import('jspdf'),
+      import('html2canvas')
+    ]);
+
+    if (!paperRef.current) return;
+
+    // Create a clone for PDF generation (with print styles)
+    const clone = paperRef.current.cloneNode(true) as HTMLElement;
+    clone.style.position = 'absolute';
+    clone.style.left = '-9999px';
+    clone.style.top = '0';
+    clone.style.width = '6.5in';
+    clone.style.padding = '0.5in';
+    clone.style.background = 'white';
+    clone.style.color = 'black';
+    clone.style.fontFamily = mode === 'screenplay' ? 'Courier, monospace' : 'Georgia, serif';
+    clone.style.fontSize = '12pt';
+    clone.style.lineHeight = mode === 'screenplay' ? '1' : '1.5';
+
+    // Style all elements for PDF
+    clone.querySelectorAll('.el').forEach((el: any) => {
+      el.style.color = 'black';
+      el.style.background = 'transparent';
+      el.style.outline = 'none';
+      el.style.border = 'none';
+      el.removeAttribute('contenteditable');
+    });
+
+    document.body.appendChild(clone);
+
+    try {
+      const canvas = await html2canvas(clone, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'in',
+        format: 'letter'
+      });
+
+      const imgWidth = 8.5;
+      const pageHeight = 11;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      pdf.save(`${filename}.pdf`);
+    } finally {
+      document.body.removeChild(clone);
+    }
+  };
+
+  const exportText = (filename: string, format: 'fountain' | 'txt' | 'md') => {
     let text = '';
-    const title = script?.title || 'Untitled';
 
     if (mode === 'screenplay') {
       if (format === 'fountain') {
-        text = `Title: ${title}\n\n`;
+        text = `Title: ${filename}\n\n`;
         elements.forEach(el => {
           if (el.type === 'scene-heading') text += `\n.${el.content}\n\n`;
           else if (el.type === 'action') text += `${el.content}\n\n`;
@@ -483,7 +360,7 @@ export default function Editor() {
           else if (el.type === 'transition') text += `> ${el.content}\n\n`;
         });
       } else {
-        text = `${title.toUpperCase()}\n${'='.repeat(40)}\n\n`;
+        text = `${filename.toUpperCase()}\n${'='.repeat(40)}\n\n`;
         elements.forEach(el => {
           if (el.type === 'scene-heading') text += `\n${el.content}\n\n`;
           else if (el.type === 'action') text += `${el.content}\n\n`;
@@ -504,7 +381,7 @@ export default function Editor() {
         else if (el.type === 'attribution') text += `\n— ${el.content}\n`;
       });
     } else if (mode === 'fiction') {
-      if (format !== 'md') text = `${title.toUpperCase()}\n${'='.repeat(40)}\n\n`;
+      if (format !== 'md') text = `${filename.toUpperCase()}\n${'='.repeat(40)}\n\n`;
       elements.forEach(el => {
         if (el.type === 'chapter-heading') text += format === 'md' ? `\n# ${el.content}\n\n` : `\n\n${el.content.toUpperCase()}\n\n`;
         else if (el.type === 'chapter-subtitle') text += format === 'md' ? `## ${el.content}\n\n` : `${el.content}\n\n`;
@@ -518,10 +395,202 @@ export default function Editor() {
     }
 
     const ext = format === 'fountain' ? 'fountain' : format === 'md' ? 'md' : 'txt';
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(text);
-    a.download = `${title}.${ext}`;
+    a.href = url;
+    a.download = `${filename}.${ext}`;
     a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // ============================================
+  // DOCUMENT CHECKER
+  // ============================================
+  
+  const runChecker = () => {
+    const foundIssues: Issue[] = [];
+    const els = [...elements];
+    
+    const addIssue = (
+      elementId: string, index: number, severity: 'warning' | 'suggestion',
+      title: string, detail: string, canAutoFix = false, fixLabel?: string, fixAction?: () => void
+    ) => {
+      foundIssues.push({ id: genId(), elementId, elementIndex: index, severity, title, detail, canAutoFix, fixLabel, fixAction });
+    };
+
+    if (mode === 'screenplay') {
+      els.forEach((el, i) => {
+        const content = el.content.trim();
+        const upper = content.toUpperCase();
+        
+        if (!content) {
+          addIssue(el.id, i, 'suggestion', 'Empty element', `This ${TYPE_LABELS[el.type]} line is empty.`, 
+            true, 'Remove', () => removeElement(el.id));
+        }
+
+        if (el.type === 'scene-heading' && content) {
+          if (!upper.startsWith('INT.') && !upper.startsWith('EXT.') && !upper.startsWith('INT/EXT') && !upper.startsWith('I/E')) {
+            addIssue(el.id, i, 'warning', 'Scene heading format', 'Should start with INT. or EXT.', 
+              true, 'Add INT.', () => updateElementContent(el.id, 'INT. ' + content));
+          }
+          if (!content.includes(' - ')) {
+            addIssue(el.id, i, 'suggestion', 'Missing time of day', 'Consider adding - DAY, - NIGHT, etc.', 
+              true, 'Add "- DAY"', () => updateElementContent(el.id, content + ' - DAY'));
+          }
+        }
+
+        if (el.type === 'dialogue' && i > 0 && content) {
+          const prev = els[i - 1];
+          if (prev.type !== 'character' && prev.type !== 'parenthetical' && prev.type !== 'dialogue') {
+            addIssue(el.id, i, 'warning', 'Orphan dialogue', 'Dialogue should follow a Character name.', false);
+          }
+        }
+
+        if (el.type === 'parenthetical' && content) {
+          const next = els[i + 1];
+          if (!next || next.type !== 'dialogue') {
+            addIssue(el.id, i, 'warning', 'Orphan parenthetical', 'Should be followed by dialogue.', false);
+          }
+        }
+
+        if (el.type === 'action' && content.length > 350) {
+          addIssue(el.id, i, 'suggestion', 'Long action block', 'Consider breaking into shorter paragraphs.', false);
+        }
+
+        if (el.type === 'character' && content) {
+          for (let j = i - 1; j >= 0; j--) {
+            if (els[j].type === 'character') {
+              if (els[j].content.trim().toUpperCase() === upper) {
+                addIssue(el.id, i, 'suggestion', 'Same character speaks again', 'Consider adding action between.', false);
+              }
+              break;
+            }
+            if (els[j].type === 'action' || els[j].type === 'scene-heading') break;
+          }
+        }
+
+        if (el.type === 'dialogue' && content.length > 15 && content === upper) {
+          addIssue(el.id, i, 'suggestion', 'All caps dialogue', 'ALL CAPS implies shouting. Intentional?', false);
+        }
+      });
+
+      if (els.length > 0 && els[0].type !== 'scene-heading') {
+        addIssue(els[0].id, 0, 'suggestion', 'Missing opening scene', 'Screenplays typically start with a Scene Heading.', false);
+      }
+    }
+
+    if (mode === 'poetry') {
+      let hasTitle = false;
+      let consecutiveBreaks = 0;
+
+      els.forEach((el, i) => {
+        const content = el.content.trim();
+        if (el.type === 'poem-title') hasTitle = true;
+
+        if ((el.type === 'verse' || el.type === 'verse-indent' || el.type === 'refrain') && !content) {
+          addIssue(el.id, i, 'suggestion', 'Empty line', 'Use Stanza Break for spacing.', 
+            true, 'Make Break', () => {
+              setElements(prev => prev.map(e => e.id === el.id ? { ...e, type: 'stanza-break', content: '' } : e));
+              markDirty();
+            });
+        }
+
+        if ((el.type === 'verse' || el.type === 'verse-indent') && content.length > 80) {
+          addIssue(el.id, i, 'suggestion', 'Long line', 'Consider breaking it.', false);
+        }
+
+        if (el.type === 'stanza-break') {
+          consecutiveBreaks++;
+          if (consecutiveBreaks > 1) {
+            addIssue(el.id, i, 'suggestion', 'Multiple breaks', 'One is usually enough.', 
+              true, 'Remove', () => removeElement(el.id));
+          }
+        } else {
+          consecutiveBreaks = 0;
+        }
+
+        if (el.type === 'attribution' && i < els.length - 1) {
+          const remaining = els.slice(i + 1).filter(e => e.content.trim());
+          if (remaining.length > 0) {
+            addIssue(el.id, i, 'suggestion', 'Attribution placement', 'Usually appears at the end.', false);
+          }
+        }
+      });
+
+      if (!hasTitle && els.length > 0) {
+        addIssue(els[0].id, 0, 'suggestion', 'No title', 'Consider adding a Title.', false);
+      }
+    }
+
+    if (mode === 'fiction') {
+      let hasChapter = false;
+      let consecutiveBreaks = 0;
+
+      els.forEach((el, i) => {
+        const content = el.content.trim();
+        if (el.type === 'chapter-heading') hasChapter = true;
+
+        if (el.type === 'body' && !content) {
+          addIssue(el.id, i, 'suggestion', 'Empty paragraph', 'Consider removing.', 
+            true, 'Remove', () => removeElement(el.id));
+        }
+
+        if (el.type === 'body' && content.split(/\s+/).length > 200) {
+          addIssue(el.id, i, 'suggestion', 'Long paragraph', 'Consider breaking it up.', false);
+        }
+
+        if (el.type === 'dialogue' && content && content.split(' ').length > 50) {
+          addIssue(el.id, i, 'suggestion', 'Long dialogue', 'Consider adding action beats.', false);
+        }
+
+        if (el.type === 'thought' && content.startsWith('"')) {
+          addIssue(el.id, i, 'suggestion', 'Quoted thought?', 'Should this be Dialogue?', 
+            true, 'Make Dialogue', () => {
+              setElements(prev => prev.map(e => e.id === el.id ? { ...e, type: 'dialogue' } : e));
+              markDirty();
+            });
+        }
+
+        if (el.type === 'scene-break') {
+          consecutiveBreaks++;
+          if (consecutiveBreaks > 1) {
+            addIssue(el.id, i, 'suggestion', 'Multiple breaks', 'One is enough.', 
+              true, 'Remove', () => removeElement(el.id));
+          }
+        } else {
+          consecutiveBreaks = 0;
+        }
+
+        if (el.type === 'chapter-heading') {
+          const next = els[i + 1];
+          if (!next || next.type === 'chapter-heading' || next.type === 'section-header') {
+            addIssue(el.id, i, 'warning', 'Empty chapter', 'No content after this chapter.', false);
+          }
+        }
+      });
+
+      if (!hasChapter && els.length > 3) {
+        addIssue(els[0].id, 0, 'suggestion', 'No chapter heading', 'Consider adding one.', false);
+      }
+    }
+
+    setIssues(foundIssues);
+    setShowChecker(true);
+  };
+
+  const getStats = () => {
+    let words = 0, scenes = 0, stanzas = 0, chapters = 0;
+    const chars = new Set<string>();
+    elements.forEach(el => {
+      words += (el.content || '').split(/\s+/).filter(Boolean).length;
+      if (el.type === 'scene-heading') scenes++;
+      if (el.type === 'character' && el.content) chars.add(el.content.toUpperCase());
+      if (el.type === 'stanza-break' || el.type === 'poem-title') stanzas++;
+      if (el.type === 'chapter-heading') chapters++;
+    });
+    return { pages: Math.max(1, Math.ceil(elements.length / 55)), scenes, words, characters: chars.size, stanzas, chapters,
+      lines: elements.filter(e => e.type === 'verse' || e.type === 'verse-indent' || e.type === 'refrain').length };
   };
 
   if (!script) return null;
@@ -576,6 +645,71 @@ export default function Editor() {
         </IonToolbar>
       </IonFooter>
 
+      {/* Export Modal */}
+      <IonModal isOpen={showExport} onDidDismiss={() => setShowExport(false)}>
+        <IonHeader>
+          <IonToolbar>
+            <IonTitle>Export</IonTitle>
+            <IonButtons slot="end">
+              <IonButton onClick={() => setShowExport(false)}>Cancel</IonButton>
+            </IonButtons>
+          </IonToolbar>
+        </IonHeader>
+        <IonContent className="ion-padding">
+          <div className="export-modal">
+            <IonItem>
+              <IonInput
+                label="Filename"
+                labelPlacement="stacked"
+                value={exportFilename}
+                onIonInput={e => setExportFilename(e.detail.value || '')}
+                placeholder="Enter filename"
+              />
+            </IonItem>
+
+            <div className="export-format-section">
+              <h3>Format</h3>
+              <IonRadioGroup value={exportFormat} onIonChange={e => setExportFormat(e.detail.value)}>
+                <IonItem>
+                  <IonLabel>
+                    <h2>PDF Document</h2>
+                    <p>Best for sharing and printing</p>
+                  </IonLabel>
+                  <IonRadio slot="start" value="pdf" />
+                </IonItem>
+                {mode === 'screenplay' && (
+                  <IonItem>
+                    <IonLabel>
+                      <h2>Fountain (.fountain)</h2>
+                      <p>Industry-standard screenplay format</p>
+                    </IonLabel>
+                    <IonRadio slot="start" value="fountain" />
+                  </IonItem>
+                )}
+                <IonItem>
+                  <IonLabel>
+                    <h2>Markdown (.md)</h2>
+                    <p>For blogs, GitHub, and other platforms</p>
+                  </IonLabel>
+                  <IonRadio slot="start" value="md" />
+                </IonItem>
+                <IonItem>
+                  <IonLabel>
+                    <h2>Plain Text (.txt)</h2>
+                    <p>Simple text, works everywhere</p>
+                  </IonLabel>
+                  <IonRadio slot="start" value="txt" />
+                </IonItem>
+              </IonRadioGroup>
+            </div>
+
+            <IonButton expand="block" onClick={doExport} disabled={exporting} style={{ marginTop: 24 }}>
+              {exporting ? 'Exporting...' : `Export as ${exportFormat.toUpperCase()}`}
+            </IonButton>
+          </div>
+        </IonContent>
+      </IonModal>
+
       {/* Document Checker Modal */}
       <IonModal isOpen={showChecker} onDidDismiss={() => setShowChecker(false)}>
         <IonHeader>
@@ -599,7 +733,7 @@ export default function Editor() {
                 {warningCount > 0 && <IonChip color="warning"><IonIcon icon={warning} /><IonLabel>{warningCount} warning{warningCount > 1 ? 's' : ''}</IonLabel></IonChip>}
                 {suggestionCount > 0 && <IonChip color="medium"><IonIcon icon={sparkles} /><IonLabel>{suggestionCount} suggestion{suggestionCount > 1 ? 's' : ''}</IonLabel></IonChip>}
               </div>
-              <p className="checker-note">These are suggestions to help guide you. Feel free to ignore any that don't fit your creative vision!</p>
+              <p className="checker-note">These are suggestions to guide you. Feel free to ignore any that don't fit your vision!</p>
               <div className="checker-issues">
                 {issues.map(issue => (
                   <div key={issue.id} className={`checker-issue checker-issue-${issue.severity}`}>
@@ -645,7 +779,7 @@ export default function Editor() {
             <div className="help-tips">
               <h3>💡 Quick Tips</h3>
               <ul>
-                <li><strong>Enter</strong> — Create new line (auto-selects next logical type)</li>
+                <li><strong>Enter</strong> — Create new line</li>
                 <li><strong>Tab</strong> — Cycle through element types</li>
                 <li><strong>Shift+Tab</strong> — Cycle backward</li>
                 <li><strong>Toolbar</strong> — Tap to change line type</li>
@@ -667,14 +801,6 @@ export default function Editor() {
           </IonList>
         </IonContent>
       </IonModal>
-
-      <IonActionSheet isOpen={showExport} onDidDismiss={() => setShowExport(false)} header="Export" buttons={[
-        { text: 'PDF (Print)', handler: exportPdf },
-        ...(mode === 'screenplay' ? [{ text: 'Fountain (.fountain)', handler: () => exportFile('fountain') }] : []),
-        { text: 'Markdown (.md)', handler: () => exportFile('md') },
-        { text: 'Plain Text (.txt)', handler: () => exportFile('txt') },
-        { text: 'Cancel', role: 'cancel' }
-      ]} />
     </IonPage>
   );
 }
