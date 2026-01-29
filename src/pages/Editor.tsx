@@ -17,26 +17,76 @@ interface Element {
 interface Script {
   id: string;
   title: string;
+  type: string;
   content: { elements: Element[]; titlePage?: any };
 }
 
-const TYPES = ['scene-heading', 'action', 'character', 'dialogue', 'parenthetical', 'transition'];
+// Element types for each document mode
+const ELEMENT_TYPES: Record<string, string[]> = {
+  screenplay: ['scene-heading', 'action', 'character', 'dialogue', 'parenthetical', 'transition'],
+  poetry: ['poem-title', 'dedication', 'verse', 'verse-indent', 'stanza-break', 'refrain', 'attribution'],
+  fiction: ['chapter-heading', 'chapter-subtitle', 'body', 'dialogue', 'thought', 'scene-break', 'letter', 'section-header']
+};
+
+// Display labels for toolbar
 const TYPE_LABELS: Record<string, string> = {
+  // Screenplay
   'scene-heading': 'Scene',
   'action': 'Action',
   'character': 'Char',
   'dialogue': 'Dialog',
   'parenthetical': 'Paren',
-  'transition': 'Trans'
+  'transition': 'Trans',
+  // Poetry
+  'poem-title': 'Title',
+  'dedication': 'Dedic',
+  'verse': 'Verse',
+  'verse-indent': 'Indent',
+  'stanza-break': 'Break',
+  'refrain': 'Refrain',
+  'attribution': 'Attrib',
+  // Fiction
+  'chapter-heading': 'Chapter',
+  'chapter-subtitle': 'Subtitle',
+  'body': 'Body',
+  'thought': 'Thought',
+  'scene-break': 'Break',
+  'letter': 'Letter',
+  'section-header': 'Section'
 };
 
+// What element type comes after pressing Enter
 const NEXT_TYPE: Record<string, string> = {
+  // Screenplay
   'scene-heading': 'action',
   'action': 'action',
   'character': 'dialogue',
   'dialogue': 'action',
   'parenthetical': 'dialogue',
-  'transition': 'scene-heading'
+  'transition': 'scene-heading',
+  // Poetry
+  'poem-title': 'verse',
+  'dedication': 'verse',
+  'verse': 'verse',
+  'verse-indent': 'verse',
+  'stanza-break': 'verse',
+  'refrain': 'verse',
+  'attribution': 'verse',
+  // Fiction
+  'chapter-heading': 'body',
+  'chapter-subtitle': 'body',
+  'body': 'body',
+  'thought': 'body',
+  'scene-break': 'body',
+  'letter': 'body',
+  'section-header': 'body'
+};
+
+// Default first element for new documents
+const DEFAULT_ELEMENT: Record<string, { type: string; content: string }> = {
+  screenplay: { type: 'scene-heading', content: 'INT. LOCATION - DAY' },
+  poetry: { type: 'poem-title', content: 'Untitled Poem' },
+  fiction: { type: 'chapter-heading', content: 'Chapter One' }
 };
 
 function genId() {
@@ -57,12 +107,28 @@ export default function Editor() {
   const saveTimer = useRef<any>(null);
   const paperRef = useRef<HTMLDivElement>(null);
 
+  // Get document mode (screenplay, poetry, fiction)
+  const getMode = (): string => {
+    if (!script) return 'screenplay';
+    const t = script.type.toLowerCase();
+    if (t === 'poetry' || t === 'poem') return 'poetry';
+    if (t === 'fiction' || t === 'novel' || t === 'short-story') return 'fiction';
+    return 'screenplay';
+  };
+
+  const mode = getMode();
+  const TYPES = ELEMENT_TYPES[mode] || ELEMENT_TYPES.screenplay;
+
   // Load script
   useEffect(() => {
     api<{ script: Script; content: any }>('/scripts/' + id).then(res => {
       if (res.script) {
         setScript(res.script);
-        setElements(res.content?.elements || []);
+        const els = res.content?.elements || [];
+        setElements(els);
+        if (els.length > 0) {
+          setActiveType(els[0].type);
+        }
       }
     });
   }, [id]);
@@ -95,7 +161,7 @@ export default function Editor() {
     setSaving(true);
     const els = Array.from(paperRef.current.querySelectorAll('.el')).map(el => ({
       id: el.getAttribute('data-id') || '',
-      type: el.className.replace('el ', ''),
+      type: el.className.replace('el ', '').split(' ')[0],
       content: el.textContent || ''
     }));
     await api('/scripts/' + script.id + '/content', {
@@ -127,7 +193,7 @@ export default function Editor() {
   const handleKeyDown = (e: React.KeyboardEvent, el: Element, index: number) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      const newEl: Element = { id: genId(), type: NEXT_TYPE[el.type] || 'action', content: '' };
+      const newEl: Element = { id: genId(), type: NEXT_TYPE[el.type] || TYPES[0], content: '' };
       const newEls = [...elements];
       newEls.splice(index + 1, 0, newEl);
       setElements(newEls);
@@ -165,52 +231,106 @@ export default function Editor() {
   };
 
   const getStats = () => {
-    let words = 0, scenes = 0;
+    let words = 0, scenes = 0, stanzas = 0, chapters = 0;
     const chars = new Set<string>();
     elements.forEach(el => {
       words += (el.content || '').split(/\s+/).filter(Boolean).length;
       if (el.type === 'scene-heading') scenes++;
       if (el.type === 'character' && el.content) chars.add(el.content.toUpperCase());
+      if (el.type === 'stanza-break' || el.type === 'poem-title') stanzas++;
+      if (el.type === 'chapter-heading') chapters++;
     });
-    return { pages: Math.max(1, Math.ceil(elements.length / 55)), scenes, words, characters: chars.size };
+    return { 
+      pages: Math.max(1, Math.ceil(elements.length / 55)), 
+      scenes, 
+      words, 
+      characters: chars.size,
+      stanzas,
+      chapters,
+      lines: elements.filter(e => e.type === 'verse' || e.type === 'verse-indent' || e.type === 'refrain').length
+    };
   };
 
   const exportPdf = () => { setShowExport(false); window.print(); };
 
-  const exportFountain = () => {
+  const exportFile = (format: 'fountain' | 'txt' | 'md') => {
     setShowExport(false);
-    let text = 'Title: ' + (script?.title || 'Untitled') + '\n\n';
-    elements.forEach(el => {
-      if (el.type === 'scene-heading') text += '\n.' + el.content + '\n\n';
-      else if (el.type === 'action') text += el.content + '\n\n';
-      else if (el.type === 'character') text += '\n@' + el.content + '\n';
-      else if (el.type === 'dialogue') text += el.content + '\n';
-      else if (el.type === 'parenthetical') text += '(' + el.content + ')\n';
-      else if (el.type === 'transition') text += '> ' + el.content + '\n\n';
-    });
-    downloadFile((script?.title || 'script') + '.fountain', text);
-  };
+    let text = '';
+    const title = script?.title || 'Untitled';
 
-  const exportTxt = () => {
-    setShowExport(false);
-    let text = (script?.title || 'Untitled').toUpperCase() + '\n\n';
-    text += '='.repeat(40) + '\n\n';
-    elements.forEach(el => {
-      if (el.type === 'scene-heading') {
-        text += '\n' + el.content + '\n\n';
-      } else if (el.type === 'action') {
-        text += el.content + '\n\n';
-      } else if (el.type === 'character') {
-        text += '\n' + ' '.repeat(20) + el.content + '\n';
-      } else if (el.type === 'dialogue') {
-        text += ' '.repeat(10) + el.content + '\n';
-      } else if (el.type === 'parenthetical') {
-        text += ' '.repeat(15) + '(' + el.content + ')\n';
-      } else if (el.type === 'transition') {
-        text += ' '.repeat(30) + el.content + '\n\n';
+    if (mode === 'screenplay') {
+      if (format === 'fountain') {
+        text = `Title: ${title}\n\n`;
+        elements.forEach(el => {
+          if (el.type === 'scene-heading') text += `\n.${el.content}\n\n`;
+          else if (el.type === 'action') text += `${el.content}\n\n`;
+          else if (el.type === 'character') text += `\n@${el.content}\n`;
+          else if (el.type === 'dialogue') text += `${el.content}\n`;
+          else if (el.type === 'parenthetical') text += `(${el.content})\n`;
+          else if (el.type === 'transition') text += `> ${el.content}\n\n`;
+        });
+      } else {
+        text = `${title.toUpperCase()}\n${'='.repeat(40)}\n\n`;
+        elements.forEach(el => {
+          if (el.type === 'scene-heading') text += `\n${el.content}\n\n`;
+          else if (el.type === 'action') text += `${el.content}\n\n`;
+          else if (el.type === 'character') text += `\n${' '.repeat(20)}${el.content}\n`;
+          else if (el.type === 'dialogue') text += `${' '.repeat(10)}${el.content}\n`;
+          else if (el.type === 'parenthetical') text += `${' '.repeat(15)}(${el.content})\n`;
+          else if (el.type === 'transition') text += `${' '.repeat(30)}${el.content}\n\n`;
+        });
       }
-    });
-    downloadFile((script?.title || 'script') + '.txt', text);
+    } else if (mode === 'poetry') {
+      if (format === 'md') {
+        elements.forEach(el => {
+          if (el.type === 'poem-title') text += `# ${el.content}\n\n`;
+          else if (el.type === 'dedication') text += `*${el.content}*\n\n`;
+          else if (el.type === 'verse') text += `${el.content}\n`;
+          else if (el.type === 'verse-indent') text += `    ${el.content}\n`;
+          else if (el.type === 'stanza-break') text += `\n`;
+          else if (el.type === 'refrain') text += `*${el.content}*\n`;
+          else if (el.type === 'attribution') text += `\n— ${el.content}\n`;
+        });
+      } else {
+        elements.forEach(el => {
+          if (el.type === 'poem-title') text += `${el.content}\n\n`;
+          else if (el.type === 'dedication') text += `For ${el.content}\n\n`;
+          else if (el.type === 'verse') text += `${el.content}\n`;
+          else if (el.type === 'verse-indent') text += `    ${el.content}\n`;
+          else if (el.type === 'stanza-break') text += `\n`;
+          else if (el.type === 'refrain') text += `${el.content}\n`;
+          else if (el.type === 'attribution') text += `\n— ${el.content}\n`;
+        });
+      }
+    } else if (mode === 'fiction') {
+      if (format === 'md') {
+        elements.forEach(el => {
+          if (el.type === 'chapter-heading') text += `\n# ${el.content}\n\n`;
+          else if (el.type === 'chapter-subtitle') text += `## ${el.content}\n\n`;
+          else if (el.type === 'section-header') text += `\n---\n\n# ${el.content}\n\n`;
+          else if (el.type === 'body') text += `${el.content}\n\n`;
+          else if (el.type === 'dialogue') text += `"${el.content}"\n\n`;
+          else if (el.type === 'thought') text += `*${el.content}*\n\n`;
+          else if (el.type === 'scene-break') text += `\n* * *\n\n`;
+          else if (el.type === 'letter') text += `> ${el.content}\n\n`;
+        });
+      } else {
+        text = `${title.toUpperCase()}\n${'='.repeat(40)}\n\n`;
+        elements.forEach(el => {
+          if (el.type === 'chapter-heading') text += `\n\n${el.content.toUpperCase()}\n\n`;
+          else if (el.type === 'chapter-subtitle') text += `${el.content}\n\n`;
+          else if (el.type === 'section-header') text += `\n\n${'*'.repeat(20)}\n\n${el.content.toUpperCase()}\n\n`;
+          else if (el.type === 'body') text += `    ${el.content}\n\n`;
+          else if (el.type === 'dialogue') text += `    "${el.content}"\n\n`;
+          else if (el.type === 'thought') text += `    ${el.content}\n\n`;
+          else if (el.type === 'scene-break') text += `\n        #\n\n`;
+          else if (el.type === 'letter') text += `        ${el.content}\n`;
+        });
+      }
+    }
+
+    const ext = format === 'fountain' ? 'fountain' : format === 'md' ? 'md' : 'txt';
+    downloadFile(`${title}.${ext}`, text);
   };
 
   const downloadFile = (name: string, content: string) => {
@@ -223,6 +343,9 @@ export default function Editor() {
   if (!script) return null;
 
   const stats = getStats();
+
+  // Get paper class based on mode
+  const paperClass = `paper paper-${mode}`;
 
   return (
     <IonPage>
@@ -254,7 +377,7 @@ export default function Editor() {
 
       <IonContent>
         <div className="editor-wrapper">
-          <div className="paper" ref={paperRef}>
+          <div className={paperClass} ref={paperRef}>
             {elements.map((el, i) => (
               <div
                 key={el.id}
@@ -302,10 +425,26 @@ export default function Editor() {
         </IonHeader>
         <IonContent className="ion-padding">
           <IonList>
-            <IonItem><IonLabel>Pages</IonLabel><IonNote slot="end">~{stats.pages}</IonNote></IonItem>
-            <IonItem><IonLabel>Scenes</IonLabel><IonNote slot="end">{stats.scenes}</IonNote></IonItem>
             <IonItem><IonLabel>Words</IonLabel><IonNote slot="end">{stats.words}</IonNote></IonItem>
-            <IonItem><IonLabel>Characters</IonLabel><IonNote slot="end">{stats.characters}</IonNote></IonItem>
+            {mode === 'screenplay' && (
+              <>
+                <IonItem><IonLabel>Pages</IonLabel><IonNote slot="end">~{stats.pages}</IonNote></IonItem>
+                <IonItem><IonLabel>Scenes</IonLabel><IonNote slot="end">{stats.scenes}</IonNote></IonItem>
+                <IonItem><IonLabel>Characters</IonLabel><IonNote slot="end">{stats.characters}</IonNote></IonItem>
+              </>
+            )}
+            {mode === 'poetry' && (
+              <>
+                <IonItem><IonLabel>Lines</IonLabel><IonNote slot="end">{stats.lines}</IonNote></IonItem>
+                <IonItem><IonLabel>Stanzas</IonLabel><IonNote slot="end">{stats.stanzas}</IonNote></IonItem>
+              </>
+            )}
+            {mode === 'fiction' && (
+              <>
+                <IonItem><IonLabel>Pages</IonLabel><IonNote slot="end">~{Math.ceil(stats.words / 250)}</IonNote></IonItem>
+                <IonItem><IonLabel>Chapters</IonLabel><IonNote slot="end">{stats.chapters}</IonNote></IonItem>
+              </>
+            )}
           </IonList>
         </IonContent>
       </IonModal>
@@ -316,8 +455,9 @@ export default function Editor() {
         header="Export"
         buttons={[
           { text: 'PDF (Print)', handler: exportPdf },
-          { text: 'Fountain (.fountain)', handler: exportFountain },
-          { text: 'Plain Text (.txt)', handler: exportTxt },
+          ...(mode === 'screenplay' ? [{ text: 'Fountain (.fountain)', handler: () => exportFile('fountain') }] : []),
+          { text: 'Markdown (.md)', handler: () => exportFile('md') },
+          { text: 'Plain Text (.txt)', handler: () => exportFile('txt') },
           { text: 'Cancel', role: 'cancel' }
         ]}
       />

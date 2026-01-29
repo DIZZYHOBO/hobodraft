@@ -40,6 +40,19 @@ async function parseBody(req: Request) {
   catch { return {}; }
 }
 
+// Get default first element based on document type
+function getDefaultElement(type: string): { type: string; content: string } {
+  const t = type.toLowerCase();
+  if (t === 'poetry' || t === 'poem') {
+    return { type: 'poem-title', content: 'Untitled Poem' };
+  }
+  if (t === 'fiction' || t === 'novel' || t === 'short-story') {
+    return { type: 'chapter-heading', content: 'Chapter One' };
+  }
+  // Default to screenplay
+  return { type: 'scene-heading', content: 'INT. LOCATION - DAY' };
+}
+
 const MIME: Record<string, string> = {
   ".html": "text/html",
   ".css": "text/css",
@@ -141,11 +154,21 @@ async function handler(req: Request): Promise<Response> {
     const b = await parseBody(req);
     const id = genId();
     const now = new Date().toISOString();
+    const docType = b.type || "feature";
+    const defaultEl = getDefaultElement(docType);
     const script = {
-      id, title: b.title || "Untitled", type: b.type || "feature", ownerId: u.id,
-      createdAt: now, updatedAt: now,
-      content: { elements: [{ id: genId(), type: "scene-heading", content: "INT. LOCATION - DAY" }], titlePage: { title: b.title || "Untitled", writtenBy: u.username } },
-      characters: [], locations: []
+      id, 
+      title: b.title || "Untitled", 
+      type: docType, 
+      ownerId: u.id,
+      createdAt: now, 
+      updatedAt: now,
+      content: { 
+        elements: [{ id: genId(), type: defaultEl.type, content: defaultEl.content }], 
+        titlePage: { title: b.title || "Untitled", writtenBy: u.username } 
+      },
+      characters: [], 
+      locations: []
     };
     await kv.set(["scripts", id], script);
     await kv.set(["scripts_by_owner", u.id, id], true);
