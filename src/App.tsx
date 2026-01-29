@@ -1,11 +1,31 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { IonApp, IonRouterOutlet, IonSpinner } from '@ionic/react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { IonApp, IonRouterOutlet, setupIonicReact } from '@ionic/react';
 import { IonReactRouter } from '@ionic/react-router';
 import { Route, Redirect } from 'react-router-dom';
+
+import '@ionic/react/css/core.css';
+import '@ionic/react/css/normalize.css';
+import '@ionic/react/css/structure.css';
+import '@ionic/react/css/typography.css';
+import '@ionic/react/css/padding.css';
+import '@ionic/react/css/float-elements.css';
+import '@ionic/react/css/text-alignment.css';
+import '@ionic/react/css/text-transformation.css';
+import '@ionic/react/css/flex-utils.css';
+import '@ionic/react/css/display.css';
+import './theme/variables.css';
+
 import Auth from './pages/Auth';
 import Dashboard from './pages/Dashboard';
 import Editor from './pages/Editor';
 import Admin from './pages/Admin';
+
+// Fix animation issues - set up Ionic with specific config
+setupIonicReact({
+  mode: 'ios',
+  animated: true,
+  swipeBackEnabled: false
+});
 
 interface User {
   id: string;
@@ -23,68 +43,79 @@ const AuthContext = createContext<AuthContextType>({ user: null, setUser: () => 
 
 export const useAuth = () => useContext(AuthContext);
 
-export async function api<T>(path: string, opts: RequestInit = {}): Promise<T> {
-  const headers: Record<string, string> = { ...(opts.headers as Record<string, string>) };
-  if (opts.body && typeof opts.body === 'object' && !(opts.body instanceof FormData)) {
-    headers['Content-Type'] = 'application/json';
-    opts.body = JSON.stringify(opts.body);
-  }
-  const res = await fetch('/api' + path, { ...opts, headers });
+export async function api<T = any>(path: string, opts: RequestInit = {}): Promise<T> {
+  const res = await fetch('/api' + path, {
+    ...opts,
+    headers: { 'Content-Type': 'application/json', ...opts.headers },
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+    credentials: 'include'
+  });
   return res.json();
 }
 
-function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    api<{ user: User | null }>('/auth/me').then(res => {
-      setUser(res.user);
-      setLoading(false);
-    });
-  }, []);
-
-  return (
-    <AuthContext.Provider value={{ user, setUser, loading }}>
-      {children}
-    </AuthContext.Provider>
-  );
-}
-
-function PrivateRoute({ children, path, exact }: { children: ReactNode; path: string; exact?: boolean }) {
+function PrivateRoute({ children, ...rest }: { children: React.ReactNode; path: string; exact?: boolean }) {
   const { user, loading } = useAuth();
   
-  if (loading) {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-        <IonSpinner name="crescent" />
-      </div>
-    );
-  }
-  
   return (
-    <Route path={path} exact={exact}>
-      {user ? children : <Redirect to="/auth" />}
-    </Route>
+    <Route
+      {...rest}
+      render={({ location }) => {
+        if (loading) return null;
+        if (!user) return <Redirect to={{ pathname: '/auth', state: { from: location } }} />;
+        return children;
+      }}
+    />
   );
 }
 
 export default function App() {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    api<{ user: User | null }>('/auth/me').then(res => {
+      if (mounted) {
+        setUser(res.user);
+        setLoading(false);
+      }
+    }).catch(() => {
+      if (mounted) setLoading(false);
+    });
+    return () => { mounted = false; };
+  }, []);
+
+  if (loading) {
+    return (
+      <IonApp>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
+          Loading...
+        </div>
+      </IonApp>
+    );
+  }
+
   return (
-    <IonApp>
-      <AuthProvider>
+    <AuthContext.Provider value={{ user, setUser, loading }}>
+      <IonApp>
         <IonReactRouter>
-          <IonRouterOutlet>
-            <Route path="/auth" exact component={Auth} />
-            <PrivateRoute path="/dashboard" exact><Dashboard /></PrivateRoute>
-            <PrivateRoute path="/editor/:id"><Editor /></PrivateRoute>
-            <PrivateRoute path="/admin" exact><Admin /></PrivateRoute>
+          <IonRouterOutlet animated={true}>
+            <Route exact path="/auth" component={Auth} />
+            <PrivateRoute exact path="/dashboard">
+              <Dashboard />
+            </PrivateRoute>
+            <PrivateRoute exact path="/editor/:id">
+              <Editor />
+            </PrivateRoute>
+            <PrivateRoute exact path="/admin">
+              <Admin />
+            </PrivateRoute>
             <Route exact path="/">
               <Redirect to="/dashboard" />
             </Route>
           </IonRouterOutlet>
         </IonReactRouter>
-      </AuthProvider>
-    </IonApp>
+      </IonApp>
+    </AuthContext.Provider>
   );
 }
