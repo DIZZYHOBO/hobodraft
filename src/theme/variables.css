@@ -570,3 +570,140 @@
     display: none !important;
   }
 }
+
+/* ============================================
+   HELP MODAL STYLES
+   ============================================ */
+
+.help-content {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.help-intro {
+  font-size: 15px;
+  line-height: 1.6;
+  color: #a1a1a6;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #2a2a2e;
+}
+
+.help-elements {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.help-element {
+  background: #1a1a1e;
+  border-radius: 12px;
+  padding: 16px;
+  border-left: 4px solid var(--ion-color-primary);
+}
+
+.help-element-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.help-element-badge {
+  background: var(--ion-color-primary);
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.help-element-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #f5f5f7;
+}
+
+.help-element-desc {
+  font-size: 14px;
+  line-height: 1.5;
+  color: #c1c1c6;
+  margin: 0 0 12px 0;
+}
+
+.help-element-example {
+  background: #0d0d0f;
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.example-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #6a6a6e;
+  font-weight: 600;
+}
+
+.help-element-example code {
+  font-family: 'Courier Prime', Courier, monospace;
+  font-size: 13px;
+  color: #818cf8;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.help-tips {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid #2a2a2e;
+}
+
+.help-tips h3 {
+  font-size: 18px;
+  margin: 0 0 16px 0;
+  color: #f5f5f7;
+}
+
+.help-tips ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.help-tips li {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #c1c1c6;
+  padding: 8px 0;
+  border-bottom: 1px solid #1a1a1e;
+}
+
+.help-tips li:last-child {
+  border-bottom: none;
+}
+
+.help-tips li strong {
+  color: var(--ion-color-primary);
+  font-weight: 600;
+}
+
+@media (max-width: 576px) {
+  .help-element {
+    padding: 12px;
+  }
+  
+  .help-element-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .help-element-desc {
+    font-size: 13px;
+  }
+}

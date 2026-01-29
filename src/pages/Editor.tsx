@@ -4,7 +4,7 @@ import {
   IonBackButton, IonIcon, IonFooter, IonModal, IonList, IonItem, IonLabel,
   IonInput, IonNote, IonActionSheet
 } from '@ionic/react';
-import { statsChart, download } from 'ionicons/icons';
+import { statsChart, download, helpCircle } from 'ionicons/icons';
 import { useParams, useHistory } from 'react-router-dom';
 import { api } from '../App';
 
@@ -82,11 +82,152 @@ const NEXT_TYPE: Record<string, string> = {
   'section-header': 'body'
 };
 
-// Default first element for new documents
-const DEFAULT_ELEMENT: Record<string, { type: string; content: string }> = {
-  screenplay: { type: 'scene-heading', content: 'INT. LOCATION - DAY' },
-  poetry: { type: 'poem-title', content: 'Untitled Poem' },
-  fiction: { type: 'chapter-heading', content: 'Chapter One' }
+// Help content for each mode
+const HELP_CONTENT: Record<string, { title: string; intro: string; elements: { name: string; label: string; description: string; example: string }[] }> = {
+  screenplay: {
+    title: '🎬 Screenplay Writing Guide',
+    intro: 'Screenplays follow a specific format that makes them easy to read and produce. Each page roughly equals one minute of screen time. Here\'s what each element is for:',
+    elements: [
+      {
+        name: 'scene-heading',
+        label: 'Scene Heading (Slugline)',
+        description: 'Tells us WHERE and WHEN the scene takes place. Always starts with INT. (interior/inside) or EXT. (exterior/outside), followed by the location and time of day.',
+        example: 'INT. COFFEE SHOP - DAY'
+      },
+      {
+        name: 'action',
+        label: 'Action',
+        description: 'Describes what we SEE and HEAR on screen. Write in present tense. Keep it visual and concise - if the camera can\'t see it, don\'t write it.',
+        example: 'Sarah pushes through the crowded café, scanning faces. She spots an empty table by the window and rushes toward it.'
+      },
+      {
+        name: 'character',
+        label: 'Character Name',
+        description: 'The name of whoever is speaking, written in CAPITALS. Appears above their dialogue. First time a character appears, their name is in ALL CAPS in the action too.',
+        example: 'SARAH'
+      },
+      {
+        name: 'dialogue',
+        label: 'Dialogue',
+        description: 'What the character says. Keep it natural and avoid long speeches. Good dialogue reveals character and moves the story forward.',
+        example: 'Is this seat taken? I\'ve been on my feet all day.'
+      },
+      {
+        name: 'parenthetical',
+        label: 'Parenthetical',
+        description: 'Brief direction for HOW a line is delivered. Use sparingly - only when the meaning would be unclear without it. Goes between character name and dialogue.',
+        example: 'sarcastically'
+      },
+      {
+        name: 'transition',
+        label: 'Transition',
+        description: 'How we move from one scene to another. Used rarely in modern scripts. CUT TO: is assumed between scenes, so only use transitions for specific effect.',
+        example: 'FADE TO BLACK.'
+      }
+    ]
+  },
+  poetry: {
+    title: '📝 Poetry Writing Guide',
+    intro: 'Poetry is the art of expressing emotions and ideas through carefully chosen words, rhythm, and imagery. Unlike prose, every line break and space matters. Here\'s what each element does:',
+    elements: [
+      {
+        name: 'poem-title',
+        label: 'Title',
+        description: 'The name of your poem. A good title can intrigue readers, hint at the theme, or add another layer of meaning. It appears centered at the top.',
+        example: 'The Road Not Taken'
+      },
+      {
+        name: 'dedication',
+        label: 'Dedication',
+        description: 'A short line dedicating the poem to someone or something. Usually appears in italics below the title. Optional but adds a personal touch.',
+        example: 'For my grandmother'
+      },
+      {
+        name: 'verse',
+        label: 'Verse Line',
+        description: 'A single line of poetry. Where you break a line affects the rhythm and meaning. End lines on strong words or natural pauses.',
+        example: 'Two roads diverged in a yellow wood'
+      },
+      {
+        name: 'verse-indent',
+        label: 'Indented Line',
+        description: 'A line that\'s pushed inward. Used for continuation of a thought, creating visual patterns, or following traditional forms. Shows connection to the line above.',
+        example: '     And sorry I could not travel both'
+      },
+      {
+        name: 'stanza-break',
+        label: 'Stanza Break',
+        description: 'A visual pause between groups of lines (stanzas). Like paragraphs in prose, stanzas group related ideas. The break gives readers a moment to absorb what they\'ve read.',
+        example: '(blank space between verse groups)'
+      },
+      {
+        name: 'refrain',
+        label: 'Refrain',
+        description: 'A line or phrase that repeats throughout the poem. Creates rhythm, emphasizes key themes, and gives the poem a musical quality. Shown in italics.',
+        example: 'And miles to go before I sleep'
+      },
+      {
+        name: 'attribution',
+        label: 'Attribution',
+        description: 'The poet\'s name or pen name at the end. Appears right-aligned with a dash before it. Used when the title doesn\'t include the author.',
+        example: '— Robert Frost'
+      }
+    ]
+  },
+  fiction: {
+    title: '📖 Fiction Writing Guide',
+    intro: 'Fiction tells stories through prose narrative. Good fiction balances action, dialogue, and internal experience to bring characters and worlds to life. Here\'s what each element does:',
+    elements: [
+      {
+        name: 'chapter-heading',
+        label: 'Chapter Heading',
+        description: 'Marks the beginning of a new chapter. Can be just a number ("Chapter One") or include a title. Chapters give readers natural stopping points and organize your story.',
+        example: 'CHAPTER ONE'
+      },
+      {
+        name: 'chapter-subtitle',
+        label: 'Chapter Subtitle',
+        description: 'Optional text below the chapter heading. Could be a title, the POV character\'s name, a date, or a thematic quote. Adds context for what\'s coming.',
+        example: 'In which our hero makes a terrible decision'
+      },
+      {
+        name: 'body',
+        label: 'Body Text',
+        description: 'The main narrative prose. Describes action, setting, and characters\' experiences. First line after a chapter or scene break isn\'t indented; all others are.',
+        example: 'The letter arrived on a Tuesday, which Sarah would later think was fitting. Tuesdays had always been unlucky for her.'
+      },
+      {
+        name: 'dialogue',
+        label: 'Dialogue',
+        description: 'What characters say out loud, wrapped in quotation marks. Each speaker gets their own paragraph. Mix dialogue with action to keep scenes dynamic.',
+        example: 'I don\'t believe you'
+      },
+      {
+        name: 'thought',
+        label: 'Internal Thought',
+        description: 'A character\'s inner monologue or private thoughts. Shown in italics. Gives readers direct access to what a character is thinking or feeling.',
+        example: 'This can\'t be happening. Not again.'
+      },
+      {
+        name: 'scene-break',
+        label: 'Scene Break',
+        description: 'A visual marker showing a jump in time, location, or point of view within a chapter. Centered symbol (usually # or ***) tells readers to expect a shift.',
+        example: '#'
+      },
+      {
+        name: 'letter',
+        label: 'Letter / Note',
+        description: 'Text from documents within the story - letters, emails, signs, newspaper clippings. Shown in a different style (indented, different font) to set it apart from narration.',
+        example: 'Dear Sarah, By the time you read this, I\'ll be gone...'
+      },
+      {
+        name: 'section-header',
+        label: 'Section / Part Header',
+        description: 'Divides the book into major sections (Part I, Part II, etc.). Bigger than chapters - used for major story divisions like time jumps or perspective shifts.',
+        example: 'PART TWO: THE RECKONING'
+      }
+    ]
+  }
 };
 
 function genId() {
@@ -104,6 +245,7 @@ export default function Editor() {
   const [saved, setSaved] = useState(true);
   const [showStats, setShowStats] = useState(false);
   const [showExport, setShowExport] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const saveTimer = useRef<any>(null);
   const paperRef = useRef<HTMLDivElement>(null);
 
@@ -118,6 +260,7 @@ export default function Editor() {
 
   const mode = getMode();
   const TYPES = ELEMENT_TYPES[mode] || ELEMENT_TYPES.screenplay;
+  const helpContent = HELP_CONTENT[mode];
 
   // Load script
   useEffect(() => {
@@ -365,10 +508,13 @@ export default function Editor() {
             <IonNote style={{ marginRight: 8, fontSize: 12 }}>
               {saving ? 'Saving...' : saved ? 'Saved' : 'Unsaved'}
             </IonNote>
-            <IonButton onClick={() => setShowStats(true)}>
+            <IonButton onClick={() => setShowHelp(true)} title="Help">
+              <IonIcon icon={helpCircle} />
+            </IonButton>
+            <IonButton onClick={() => setShowStats(true)} title="Stats">
               <IonIcon icon={statsChart} />
             </IonButton>
-            <IonButton onClick={() => setShowExport(true)}>
+            <IonButton onClick={() => setShowExport(true)} title="Export">
               <IonIcon icon={download} />
             </IonButton>
           </IonButtons>
@@ -414,6 +560,50 @@ export default function Editor() {
         </IonToolbar>
       </IonFooter>
 
+      {/* Help Modal */}
+      <IonModal isOpen={showHelp} onDidDismiss={() => setShowHelp(false)}>
+        <IonHeader>
+          <IonToolbar>
+            <IonTitle>{helpContent.title}</IonTitle>
+            <IonButtons slot="end">
+              <IonButton onClick={() => setShowHelp(false)}>Close</IonButton>
+            </IonButtons>
+          </IonToolbar>
+        </IonHeader>
+        <IonContent className="ion-padding">
+          <div className="help-content">
+            <p className="help-intro">{helpContent.intro}</p>
+            
+            <div className="help-elements">
+              {helpContent.elements.map((item, index) => (
+                <div key={index} className="help-element">
+                  <div className="help-element-header">
+                    <span className="help-element-badge">{TYPE_LABELS[item.name]}</span>
+                    <h3>{item.label}</h3>
+                  </div>
+                  <p className="help-element-desc">{item.description}</p>
+                  <div className="help-element-example">
+                    <span className="example-label">Example:</span>
+                    <code>{item.example}</code>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="help-tips">
+              <h3>💡 Quick Tips</h3>
+              <ul>
+                <li><strong>Enter</strong> — Create a new line (auto-selects the next logical element type)</li>
+                <li><strong>Tab</strong> — Cycle forward through element types</li>
+                <li><strong>Shift + Tab</strong> — Cycle backward through element types</li>
+                <li><strong>Toolbar buttons</strong> — Tap to change the current line's type</li>
+              </ul>
+            </div>
+          </div>
+        </IonContent>
+      </IonModal>
+
+      {/* Stats Modal */}
       <IonModal isOpen={showStats} onDidDismiss={() => setShowStats(false)}>
         <IonHeader>
           <IonToolbar>
