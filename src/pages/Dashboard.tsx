@@ -4,7 +4,7 @@ import {
   IonIcon, IonFab, IonFabButton, IonModal, IonItem, IonInput, IonLabel,
   IonSelect, IonSelectOption, IonSegment, IonSegmentButton
 } from '@ionic/react';
-import { add, logOut, trash, settings } from 'ionicons/icons';
+import { add, logOut, trash, settings, filterOutline } from 'ionicons/icons';
 import { useHistory } from 'react-router-dom';
 import { api, useAuth } from '../App';
 import { 
@@ -40,6 +40,7 @@ export default function Dashboard() {
   const [newTitle, setNewTitle] = useState('');
   const [newType, setNewType] = useState('feature');
   const [category, setCategory] = useState<'screenplay' | 'poetry' | 'fiction'>('screenplay');
+  const [filterType, setFilterType] = useState<string>('all');
   const history = useHistory();
   const { user, setUser } = useAuth();
 
@@ -66,6 +67,7 @@ export default function Dashboard() {
       body: { title: newTitle, type: newType } as any
     });
     if (res.script) {
+      setScripts(prev => [res.script, ...prev]);
       setShowNew(false);
       setNewTitle('');
       history.push('/editor/' + res.script.id);
@@ -75,8 +77,8 @@ export default function Dashboard() {
   const deleteScript = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!confirm('Delete this script?')) return;
+    setScripts(prev => prev.filter(s => s.id !== id));
     await api('/scripts/' + id, { method: 'DELETE' });
-    loadScripts();
   };
 
   const logout = async () => {
@@ -97,6 +99,10 @@ export default function Dashboard() {
     if (days < 7) return `${days} days ago`;
     return date.toLocaleDateString();
   };
+
+  const filteredScripts = filterType === 'all' 
+    ? scripts 
+    : scripts.filter(s => s.type === filterType);
 
   return (
     <IonPage>
@@ -119,17 +125,48 @@ export default function Dashboard() {
       </IonHeader>
 
       <IonContent className="ion-padding">
-        {scripts.length === 0 ? (
+        <div className="dashboard-filter-bar">
+          <div className="filter-select-wrapper">
+            <IonIcon icon={filterOutline} className="filter-icon" />
+            <select 
+              className="filter-select"
+              value={filterType} 
+              onChange={e => setFilterType(e.target.value)}
+            >
+              <option value="all">All Scripts</option>
+              <optgroup label="Screenplay">
+                {CATEGORIES.screenplay.types.map(t => (
+                  <option key={t} value={t}>{TYPE_LABELS[t]}</option>
+                ))}
+              </optgroup>
+              <optgroup label="Poetry">
+                {CATEGORIES.poetry.types.map(t => (
+                  <option key={t} value={t}>{TYPE_LABELS[t]}</option>
+                ))}
+              </optgroup>
+              <optgroup label="Fiction">
+                {CATEGORIES.fiction.types.map(t => (
+                  <option key={t} value={t}>{TYPE_LABELS[t]}</option>
+                ))}
+              </optgroup>
+            </select>
+          </div>
+          <span className="script-count">
+            {filteredScripts.length} {filteredScripts.length === 1 ? 'script' : 'scripts'}
+          </span>
+        </div>
+
+        {filteredScripts.length === 0 ? (
           <div style={{ textAlign: 'center', paddingTop: 60 }}>
             <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'center' }}>
               <PenNibIcon size={48} color="#6366f1" />
             </div>
-            <h2>No scripts yet</h2>
+            <h2>{filterType === 'all' ? 'No scripts yet' : `No ${TYPE_LABELS[filterType] || filterType} scripts`}</h2>
             <p style={{ color: '#888' }}>Tap + to create your first script</p>
           </div>
         ) : (
           <div className="scripts-grid">
-            {scripts.map(s => (
+            {filteredScripts.map(s => (
               <div key={s.id} className="script-card" onClick={() => history.push('/editor/' + s.id)}>
                 <div className="script-card-top">
                   <span className="script-type-icon">{getTypeIcon(s.type, 32, '#1a1a1e')}</span>
@@ -167,22 +204,24 @@ export default function Dashboard() {
             </IonToolbar>
           </IonHeader>
           <IonContent className="ion-padding">
-            <div className="category-selector">
+            <div className="category-selector dark-segment">
               <h3>Category</h3>
-              <IonSegment value={category} onIonChange={e => setCategory(e.detail.value as any)}>
-                <IonSegmentButton value="screenplay">
-                  <div className="segment-icon"><ClapperboardIcon size={24} /></div>
-                  <IonLabel>Screenplay</IonLabel>
-                </IonSegmentButton>
-                <IonSegmentButton value="poetry">
-                  <div className="segment-icon"><QuillIcon size={24} /></div>
-                  <IonLabel>Poetry</IonLabel>
-                </IonSegmentButton>
-                <IonSegmentButton value="fiction">
-                  <div className="segment-icon"><BookOpenIcon size={24} /></div>
-                  <IonLabel>Fiction</IonLabel>
-                </IonSegmentButton>
-              </IonSegment>
+              <div className="dark-segment-container">
+                <IonSegment value={category} onIonChange={e => setCategory(e.detail.value as any)}>
+                  <IonSegmentButton value="screenplay">
+                    <div className="segment-icon"><ClapperboardIcon size={24} /></div>
+                    <IonLabel>Screenplay</IonLabel>
+                  </IonSegmentButton>
+                  <IonSegmentButton value="poetry">
+                    <div className="segment-icon"><QuillIcon size={24} /></div>
+                    <IonLabel>Poetry</IonLabel>
+                  </IonSegmentButton>
+                  <IonSegmentButton value="fiction">
+                    <div className="segment-icon"><BookOpenIcon size={24} /></div>
+                    <IonLabel>Fiction</IonLabel>
+                  </IonSegmentButton>
+                </IonSegment>
+              </div>
             </div>
 
             <IonItem>

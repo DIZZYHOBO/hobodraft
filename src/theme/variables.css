@@ -119,6 +119,89 @@
   margin-bottom: 4px; 
 }
 
+/* Dashboard Filter Bar */
+.dashboard-filter-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  margin-bottom: 8px;
+}
+
+.filter-select-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #1a1a1e;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #333;
+}
+
+.filter-icon {
+  color: #a1a1a6;
+  font-size: 18px;
+}
+
+.filter-select {
+  background: transparent;
+  border: none;
+  color: #f5f5f7;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  outline: none;
+  padding-right: 8px;
+}
+
+.filter-select option,
+.filter-select optgroup {
+  background: #1a1a1e;
+  color: #f5f5f7;
+}
+
+.filter-select optgroup {
+  font-weight: 600;
+  color: #6366f1;
+}
+
+.script-count {
+  font-size: 13px;
+  color: #6a6a6e;
+}
+
+/* Dark Segment for Category Selector */
+.dark-segment .dark-segment-container {
+  background: #0d0d0f;
+  border-radius: 12px;
+  padding: 4px;
+  border: 1px solid #333;
+}
+
+.dark-segment ion-segment {
+  --background: transparent;
+}
+
+.dark-segment ion-segment-button {
+  --background: transparent;
+  --background-checked: #6366f1;
+  --color: #a1a1a6;
+  --color-checked: #ffffff;
+  --indicator-color: transparent;
+  --border-radius: 8px;
+  min-height: 72px;
+  margin: 2px;
+}
+
+.dark-segment ion-segment-button::part(indicator-background) {
+  background: #6366f1;
+  border-radius: 8px;
+}
+
+.dark-segment ion-segment-button::part(native) {
+  border-radius: 8px;
+}
+
 /* ============================================
    EDITOR - Header Styles
    ============================================ */
