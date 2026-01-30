@@ -4,7 +4,7 @@ import {
   IonIcon, IonFab, IonFabButton, IonModal, IonItem, IonInput, IonLabel,
   IonSelect, IonSelectOption, IonSegment, IonSegmentButton
 } from '@ionic/react';
-import { add, logOut, trash, settings, filterOutline } from 'ionicons/icons';
+import { add, logOut, trash, settings, filterOutline, pencil } from 'ionicons/icons';
 import { useHistory } from 'react-router-dom';
 import { api, useAuth } from '../App';
 import { 
@@ -41,6 +41,8 @@ export default function Dashboard() {
   const [newType, setNewType] = useState('feature');
   const [category, setCategory] = useState<'screenplay' | 'poetry' | 'fiction'>('screenplay');
   const [filterType, setFilterType] = useState<string>('all');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState('');
   const history = useHistory();
   const { user, setUser } = useAuth();
 
@@ -81,10 +83,32 @@ export default function Dashboard() {
     await api('/scripts/' + id, { method: 'DELETE' });
   };
 
+  const startEdit = (script: Script, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingId(script.id);
+    setEditTitle(script.title);
+  };
+
+  const saveEdit = async () => {
+    if (!editingId || !editTitle.trim()) return;
+    setScripts(prev => prev.map(s => s.id === editingId ? { ...s, title: editTitle.trim() } : s));
+    await api('/scripts/' + editingId, {
+      method: 'PUT',
+      body: { title: editTitle.trim() } as any
+    });
+    setEditingId(null);
+    setEditTitle('');
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditTitle('');
+  };
+
   const logout = async () => {
     await api('/auth/logout', { method: 'POST' });
-    setUser(null);
-    history.push('/auth');
+    // Use window.location to avoid React Router state update conflicts
+    window.location.href = '/auth';
   };
 
   const formatDate = (d: string) => {
@@ -179,9 +203,14 @@ export default function Dashboard() {
                       <span>Edited {formatDate(s.updatedAt)}</span>
                     </div>
                   </div>
-                  <button className="delete-btn" onClick={(e) => deleteScript(s.id, e)}>
-                    <IonIcon icon={trash} />
-                  </button>
+                  <div className="card-actions">
+                    <button className="edit-btn" onClick={(e) => startEdit(s, e)}>
+                      <IonIcon icon={pencil} />
+                    </button>
+                    <button className="delete-btn" onClick={(e) => deleteScript(s.id, e)}>
+                      <IonIcon icon={trash} />
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -194,6 +223,34 @@ export default function Dashboard() {
           </IonFabButton>
         </IonFab>
 
+        {/* Edit Title Modal */}
+        <IonModal isOpen={!!editingId} onDidDismiss={cancelEdit}>
+          <IonHeader>
+            <IonToolbar>
+              <IonTitle>Rename Script</IonTitle>
+              <IonButtons slot="end">
+                <IonButton onClick={cancelEdit}>Cancel</IonButton>
+              </IonButtons>
+            </IonToolbar>
+          </IonHeader>
+          <IonContent className="ion-padding">
+            <IonItem>
+              <IonInput
+                label="Title"
+                labelPlacement="stacked"
+                placeholder="Enter new title"
+                value={editTitle}
+                onIonInput={e => setEditTitle(e.detail.value || '')}
+                onKeyDown={e => e.key === 'Enter' && saveEdit()}
+              />
+            </IonItem>
+            <IonButton expand="block" onClick={saveEdit} style={{ marginTop: 24 }}>
+              Save
+            </IonButton>
+          </IonContent>
+        </IonModal>
+
+        {/* New Script Modal */}
         <IonModal isOpen={showNew} onDidDismiss={() => setShowNew(false)}>
           <IonHeader>
             <IonToolbar>

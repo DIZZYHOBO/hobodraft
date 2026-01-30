@@ -93,18 +93,39 @@ async function handler(req: Request): Promise<Response> {
     if (username.length < 3) return json({ error: "Username too short" }, 400);
     const existing = await kv.get(["users_by_username", username]);
     if (existing.value) return json({ error: "Username taken" }, 400);
+    
+    // Count existing users to determine if this is the first user
     const list = kv.list({ prefix: ["users"] });
     let count = 0;
     for await (const _ of list) count++;
+    
     const id = genId();
-    const user = { id, username, pw: await hash(b.password), role: count === 0 ? "admin" : "user" };
+    const now = new Date().toISOString();
+    const isFirstUser = count === 0;
+    
+    // First user is auto-approved admin, others are pending
+    const user = { 
+      id, 
+      username, 
+      pw: await hash(b.password), 
+      role: isFirstUser ? "admin" : "user",
+      status: isFirstUser ? "approved" : "pending",
+      createdAt: now
+    };
+    
     await kv.set(["users", id], user);
     await kv.set(["users_by_username", username], id);
-    const token = genId();
-    await kv.set(["sessions", token], { uid: id, exp: new Date(Date.now() + 2592000000).toISOString() });
-    return json({ success: true, user: { id, username, role: user.role } }, 200, {
-      "Set-Cookie": "session=" + token + "; Path=/; HttpOnly; Max-Age=2592000; SameSite=Lax"
-    });
+    
+    // First user gets logged in immediately, others must wait for approval
+    if (isFirstUser) {
+      const token = genId();
+      await kv.set(["sessions", token], { uid: id, exp: new Date(Date.now() + 2592000000).toISOString() });
+      return json({ success: true, user: { id, username, role: user.role, status: user.status } }, 200, {
+        "Set-Cookie": "session=" + token + "; Path=/; HttpOnly; Max-Age=2592000; SameSite=Lax"
+      });
+    } else {
+      return json({ success: true, pending: true, message: "Registration submitted. Please wait for admin approval." });
+    }
   }
 
   if (p === "/api/auth/login" && m === "POST") {
@@ -115,8 +136,14 @@ async function handler(req: Request): Promise<Response> {
     if (!uidRes.value) return json({ error: "Invalid credentials" }, 401);
     const userRes = await kv.get(["users", uidRes.value as string]);
     if (!userRes.value) return json({ error: "Invalid credentials" }, 401);
-    const user = userRes.value as { id: string; username: string; pw: string; role: string };
+    const user = userRes.value as { id: string; username: string; pw: string; role: string; status?: string };
     if (user.pw !== await hash(b.password)) return json({ error: "Invalid credentials" }, 401);
+    
+    // Check if user is approved
+    if (user.status === "pending") {
+      return json({ error: "Your account is pending admin approval" }, 403);
+    }
+    
     const token = genId();
     await kv.set(["sessions", token], { uid: user.id, exp: new Date(Date.now() + 2592000000).toISOString() });
     return json({ success: true, user: { id: user.id, username: user.username, role: user.role } }, 200, {
@@ -131,7 +158,7 @@ async function handler(req: Request): Promise<Response> {
   }
 
   if (p === "/api/auth/me") {
-    const u = await getUser(req) as { id: string; username: string; role: string } | null;
+    const u = await getUser(req) as { id: string; username: string; role: string; status?: string } | null;
     return json(u ? { user: { id: u.id, username: u.username, role: u.role } } : { user: null });
   }
 
@@ -213,27 +240,93 @@ async function handler(req: Request): Promise<Response> {
     return json({ success: true });
   }
 
-  if (p === "/api/admin/users") {
+  // Admin: Get all users
+  if (p === "/api/admin/users" && m === "GET") {
     const u = await getUser(req) as { role: string } | null;
     if (!u || u.role !== "admin") return json({ error: "Forbidden" }, 403);
     const list: unknown[] = [];
     for await (const entry of kv.list({ prefix: ["users"] })) {
-      const x = entry.value as { id: string; username: string; role: string };
-      list.push({ id: x.id, username: x.username, role: x.role });
+      const x = entry.value as { id: string; username: string; role: string; status?: string; createdAt?: string };
+      list.push({ 
+        id: x.id, 
+        username: x.username, 
+        role: x.role, 
+        status: x.status || 'approved',
+        createdAt: x.createdAt || ''
+      });
     }
+    // Sort by createdAt descending (newest first)
+    list.sort((a: any, b: any) => {
+      if (!a.createdAt) return 1;
+      if (!b.createdAt) return -1;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
     return json({ users: list });
   }
 
+  // Admin: Update user (approve, change role, etc.)
+  const um = p.match(/^\/api\/admin\/users\/([a-f0-9-]+)$/);
+  if (um) {
+    const u = await getUser(req) as { role: string; id: string } | null;
+    if (!u || u.role !== "admin") return json({ error: "Forbidden" }, 403);
+    
+    const userId = um[1];
+    const userRes = await kv.get(["users", userId]);
+    if (!userRes.value) return json({ error: "User not found" }, 404);
+    
+    if (m === "PUT") {
+      const b = await parseBody(req);
+      const user = userRes.value as { id: string; username: string; role: string; status?: string; pw: string; createdAt?: string };
+      
+      // Update role if provided
+      if (b.role !== undefined) {
+        user.role = b.role;
+      }
+      
+      // Update status if provided (approve/reject)
+      if (b.status !== undefined) {
+        user.status = b.status;
+      }
+      
+      await kv.set(["users", userId], user);
+      return json({ success: true, user: { id: user.id, username: user.username, role: user.role, status: user.status } });
+    }
+    
+    if (m === "DELETE") {
+      // Don't allow deleting yourself
+      if (userId === u.id) {
+        return json({ error: "Cannot delete yourself" }, 400);
+      }
+      
+      const user = userRes.value as { username: string };
+      
+      // Delete user's scripts
+      for await (const entry of kv.list({ prefix: ["scripts_by_owner", userId] })) {
+        const sid = entry.key[2] as string;
+        await kv.delete(["scripts", sid]);
+        await kv.delete(["scripts_by_owner", userId, sid]);
+      }
+      
+      // Delete user
+      await kv.delete(["users", userId]);
+      await kv.delete(["users_by_username", user.username]);
+      
+      return json({ success: true });
+    }
+  }
+
+  // Admin: Stats
   if (p === "/api/admin/stats") {
     const u = await getUser(req) as { role: string } | null;
     if (!u || u.role !== "admin") return json({ error: "Forbidden" }, 403);
-    let uc = 0, sc = 0, ac = 0;
+    let totalUsers = 0, totalScripts = 0, pendingUsers = 0;
     for await (const entry of kv.list({ prefix: ["users"] })) {
-      uc++;
-      if ((entry.value as { role: string }).role === "admin") ac++;
+      totalUsers++;
+      const user = entry.value as { status?: string };
+      if (user.status === "pending") pendingUsers++;
     }
-    for await (const _ of kv.list({ prefix: ["scripts"] })) sc++;
-    return json({ stats: { users: uc, scripts: sc, admins: ac } });
+    for await (const _ of kv.list({ prefix: ["scripts"] })) totalScripts++;
+    return json({ stats: { totalUsers, totalScripts, pendingUsers } });
   }
 
   if (p.startsWith("/api/")) return json({ error: "Not found" }, 404);
