@@ -5,7 +5,6 @@ import {
 } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
 import { api, useAuth } from '../App';
-import { LogoIcon } from '../components/Icons';
 
 export default function Auth() {
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -49,17 +48,14 @@ export default function Auth() {
       <IonContent className="ion-padding">
         <div style={{ maxWidth: 400, margin: '0 auto', paddingTop: 40 }}>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 24 }}>
-            <LogoIcon size={64} />
-            <h1 style={{ textAlign: 'center', marginTop: 16, marginBottom: 0 }}>HoboDraft</h1>
+            <img src="/logo.png" alt="HoboDraft" style={{ maxWidth: 280, height: 'auto' }} />
           </div>
-          <p style={{ textAlign: 'center', color: '#888', marginBottom: 32 }}>
-            Professional screenwriting for everyone
-          </p>
-
-          <IonSegment value={mode} onIonChange={e => setMode(e.detail.value as 'login' | 'register')}>
-            <IonSegmentButton value="login"><IonLabel>Sign In</IonLabel></IonSegmentButton>
-            <IonSegmentButton value="register"><IonLabel>Sign Up</IonLabel></IonSegmentButton>
-          </IonSegment>
+          <div style={{ marginTop: 16 }}>
+            <IonSegment value={mode} onIonChange={e => setMode(e.detail.value as 'login' | 'register')}>
+              <IonSegmentButton value="login"><IonLabel>Sign In</IonLabel></IonSegmentButton>
+              <IonSegmentButton value="register"><IonLabel>Sign Up</IonLabel></IonSegmentButton>
+            </IonSegment>
+          </div>
 
           <IonCard style={{ marginTop: 24 }}>
             <IonCardContent>
