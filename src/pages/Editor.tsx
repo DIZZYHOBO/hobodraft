@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonButton,
-  IonIcon, IonFooter, IonModal, IonList, IonItem, IonLabel,
+  IonIcon, IonModal, IonList, IonItem, IonLabel,
   IonInput, IonNote, IonBadge, IonChip, IonRadioGroup, IonRadio
 } from '@ionic/react';
 import { statsChart, download, helpCircle, checkmarkCircle, warning, construct, locate, sparkles, arrowBack } from 'ionicons/icons';
@@ -127,8 +127,10 @@ export default function Editor() {
   const [exportFilename, setExportFilename] = useState('');
   const [exportFormat, setExportFormat] = useState('pdf');
   const [exporting, setExporting] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const paperRef = useRef<HTMLDivElement>(null);
+  const toolbarRef = useRef<HTMLDivElement>(null);
 
   const getMode = (): string => {
     if (!script) return 'screenplay';
@@ -171,6 +173,33 @@ export default function Editor() {
     if (script?.title) setExportFilename(script.title);
   }, [script?.title]);
 
+  // Handle keyboard visibility for mobile
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.visualViewport) {
+        const viewport = window.visualViewport;
+        const keyboardH = window.innerHeight - viewport.height;
+        setKeyboardHeight(Math.max(0, keyboardH));
+      }
+    };
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleResize);
+      window.visualViewport.addEventListener('scroll', handleResize);
+    }
+    
+    // Fallback for older browsers
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleResize);
+        window.visualViewport.removeEventListener('scroll', handleResize);
+      }
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+
   const saveNow = async () => {
     if (!script || !paperRef.current) return;
     setSaving(true);
@@ -199,20 +228,32 @@ export default function Editor() {
 
   const handleFocus = (el: ScriptElement) => { setActiveId(el.id); setActiveType(el.type); };
 
+  const isMobile = () => {
+    return window.innerWidth <= 768 || ('ontouchstart' in window);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent, el: ScriptElement, index: number) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      const newEl: ScriptElement = { id: genId(), type: NEXT_TYPE[el.type] || TYPES[0], content: '' };
-      const newEls = [...elements];
-      newEls.splice(index + 1, 0, newEl);
-      setElements(newEls);
-      setActiveId(newEl.id);
-      setActiveType(newEl.type);
-      markDirty();
-      setTimeout(() => {
-        const newDiv = paperRef.current?.querySelector(`[data-id="${newEl.id}"]`) as HTMLElement;
-        newDiv?.focus();
-      }, 10);
+    if (e.key === 'Enter') {
+      // On mobile: Enter creates newline, Shift+Enter creates new element
+      // On desktop: Enter creates new element, Shift+Enter creates newline
+      const mobile = isMobile();
+      const shouldCreateNewElement = mobile ? e.shiftKey : !e.shiftKey;
+      
+      if (shouldCreateNewElement) {
+        e.preventDefault();
+        const newEl: ScriptElement = { id: genId(), type: NEXT_TYPE[el.type] || TYPES[0], content: '' };
+        const newEls = [...elements];
+        newEls.splice(index + 1, 0, newEl);
+        setElements(newEls);
+        setActiveId(newEl.id);
+        setActiveType(newEl.type);
+        markDirty();
+        setTimeout(() => {
+          const newDiv = paperRef.current?.querySelector(`[data-id="${newEl.id}"]`) as HTMLElement;
+          newDiv?.focus();
+        }, 10);
+      }
+      // If not creating new element, let the default behavior happen (newline)
     }
     if (e.key === 'Tab') {
       e.preventDefault();
@@ -220,6 +261,24 @@ export default function Editor() {
       const newIdx = e.shiftKey ? (curIdx - 1 + TYPES.length) % TYPES.length : (curIdx + 1) % TYPES.length;
       changeType(el.id, TYPES[newIdx]);
     }
+  };
+
+  const addNewElement = () => {
+    if (!activeId) return;
+    const currentIndex = elements.findIndex(el => el.id === activeId);
+    if (currentIndex === -1) return;
+    const currentEl = elements[currentIndex];
+    const newEl: ScriptElement = { id: genId(), type: NEXT_TYPE[currentEl.type] || TYPES[0], content: '' };
+    const newEls = [...elements];
+    newEls.splice(currentIndex + 1, 0, newEl);
+    setElements(newEls);
+    setActiveId(newEl.id);
+    setActiveType(newEl.type);
+    markDirty();
+    setTimeout(() => {
+      const newDiv = paperRef.current?.querySelector(`[data-id="${newEl.id}"]`) as HTMLElement;
+      newDiv?.focus();
+    }, 10);
   };
 
   const changeType = (elId: string, newType: string) => {
@@ -621,11 +680,17 @@ export default function Editor() {
               <IonIcon icon={arrowBack} />
             </IonButton>
           </IonButtons>
-          <IonTitle>
-            <IonInput value={script.title} onIonChange={e => updateTitle(e.detail.value || '')} style={{ textAlign: 'center' }} />
-          </IonTitle>
+          <div className="editor-title-container">
+            <input
+              type="text"
+              className="editor-title-input"
+              value={script.title}
+              onChange={e => updateTitle(e.target.value)}
+              placeholder="Untitled"
+            />
+            <span className="editor-save-status">{saving ? 'Saving...' : saved ? 'Saved' : 'Unsaved'}</span>
+          </div>
           <IonButtons slot="end">
-            <IonNote style={{ marginRight: 8, fontSize: 12 }}>{saving ? 'Saving...' : saved ? 'Saved' : 'Unsaved'}</IonNote>
             <IonButton onClick={() => setShowHelp(true)} title="Help"><IonIcon icon={helpCircle} /></IonButton>
             <IonButton onClick={runChecker} title="Check Document"><IonIcon icon={construct} /></IonButton>
             <IonButton onClick={() => setShowStats(true)} title="Stats"><IonIcon icon={statsChart} /></IonButton>
@@ -647,18 +712,28 @@ export default function Editor() {
         </div>
       </IonContent>
 
-      <IonFooter>
-        <IonToolbar>
-          <div className="toolbar-buttons">
-            {TYPES.map(type => (
-              <button key={type} className={'toolbar-btn' + (activeType === type ? ' active' : '')}
-                onTouchEnd={e => handleToolbarTap(type, e)} onClick={e => handleToolbarTap(type, e)}>
-                {TYPE_LABELS[type]}
-              </button>
-            ))}
-          </div>
-        </IonToolbar>
-      </IonFooter>
+      <div 
+        ref={toolbarRef}
+        className="editor-toolbar-container"
+        style={{ bottom: keyboardHeight > 0 ? `${keyboardHeight}px` : '0' }}
+      >
+        <div className="toolbar-buttons">
+          {TYPES.map(type => (
+            <button key={type} className={'toolbar-btn' + (activeType === type ? ' active' : '')}
+              onTouchEnd={e => handleToolbarTap(type, e)} onClick={e => handleToolbarTap(type, e)}>
+              {TYPE_LABELS[type]}
+            </button>
+          ))}
+          <button 
+            className="toolbar-btn toolbar-btn-new"
+            onTouchEnd={e => { e.preventDefault(); addNewElement(); }}
+            onClick={addNewElement}
+            title="New element"
+          >
+            +
+          </button>
+        </div>
+      </div>
 
       {/* Export Modal */}
       <IonModal isOpen={showExport} onDidDismiss={() => setShowExport(false)}>
@@ -809,10 +884,11 @@ export default function Editor() {
                 <span>Quick Tips</span>
               </h3>
               <ul>
-                <li><strong>Enter</strong> — Create new line</li>
+                <li><strong>Mobile:</strong> Enter = new line, tap <strong>+</strong> = new element</li>
+                <li><strong>Desktop:</strong> Enter = new element, Shift+Enter = new line</li>
                 <li><strong>Tab</strong> — Cycle through element types</li>
                 <li><strong>Shift+Tab</strong> — Cycle backward</li>
-                <li><strong>Toolbar</strong> — Tap to change line type</li>
+                <li><strong>Toolbar</strong> — Tap to change current line type</li>
               </ul>
             </div>
           </div>

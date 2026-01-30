@@ -120,6 +120,52 @@
 }
 
 /* ============================================
+   EDITOR - Header Styles
+   ============================================ */
+
+.editor-title-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-width: 0;
+  padding: 0 8px;
+  overflow: hidden;
+}
+
+.editor-title-input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #f5f5f7;
+  font-size: 16px;
+  font-weight: 600;
+  text-align: center;
+  width: 100%;
+  max-width: 200px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.editor-title-input:focus {
+  background: rgba(99, 102, 241, 0.15);
+}
+
+.editor-title-input::placeholder {
+  color: #6a6a6e;
+}
+
+.editor-save-status {
+  font-size: 10px;
+  color: #6a6a6e;
+  margin-top: 2px;
+}
+
+/* ============================================
    EDITOR - Common Styles
    ============================================ */
 
@@ -127,6 +173,7 @@
   display: flex;
   justify-content: center;
   padding: 24px;
+  padding-bottom: 80px; /* Space for fixed toolbar */
   min-height: 100%;
   background: var(--ion-background-color);
 }
@@ -215,8 +262,20 @@
 .el.section-header { font-size: 14pt; font-weight: bold; text-align: center; margin-top: 64px; margin-bottom: 32px; text-transform: uppercase; letter-spacing: 4px; border-top: 1px solid #4a4a4e; border-bottom: 1px solid #4a4a4e; padding: 16px 0; }
 
 /* ============================================
-   TOOLBAR
+   TOOLBAR - Floating above keyboard
    ============================================ */
+
+.editor-toolbar-container {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #1a1a1e;
+  border-top: 1px solid #2a2a2e;
+  z-index: 1000;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  transition: bottom 0.1s ease-out;
+}
 
 .toolbar-buttons { display: flex; justify-content: space-around; padding: 8px 4px; gap: 4px; overflow-x: auto; }
 
@@ -239,6 +298,19 @@
 
 .toolbar-btn:active { background: var(--ion-color-primary); color: white; }
 .toolbar-btn.active { background: var(--ion-color-primary); color: white; }
+
+.toolbar-btn-new {
+  background: #22c55e !important;
+  color: white !important;
+  font-size: 18px !important;
+  font-weight: bold;
+  min-width: 44px !important;
+  flex: 0 0 44px !important;
+}
+
+.toolbar-btn-new:active {
+  background: #16a34a !important;
+}
 
 /* ============================================
    DOCUMENT CHECKER
@@ -355,7 +427,7 @@
    ============================================ */
 
 @media (max-width: 576px) {
-  .editor-wrapper { padding: 16px; }
+  .editor-wrapper { padding: 16px; padding-bottom: 80px; }
   .paper { padding: 24px; min-height: auto; }
   .paper-poetry { padding: 24px; }
   .paper-fiction { padding: 24px; }
@@ -372,6 +444,17 @@
   .checker-issue { padding: 12px; }
   .issue-actions { flex-direction: column; }
   .issue-actions ion-button { width: 100%; }
+  
+  /* Editor header mobile adjustments */
+  .editor-title-input {
+    font-size: 14px;
+    max-width: 140px;
+  }
+  
+  .editor-toolbar-container {
+    padding: 4px 0;
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
 }
 
 /* ============================================
