@@ -19,8 +19,8 @@ interface Script {
   id: string;
   title: string;
   type: string;
-  created_at: string;
-  updated_at: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -86,7 +86,9 @@ export default function Dashboard() {
   };
 
   const formatDate = (d: string) => {
+    if (!d) return 'Just now';
     const date = new Date(d);
+    if (isNaN(date.getTime())) return 'Just now';
     const now = new Date();
     const diff = now.getTime() - date.getTime();
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
@@ -100,7 +102,9 @@ export default function Dashboard() {
     <IonPage>
       <IonHeader>
         <IonToolbar>
-          <IonTitle>My Scripts</IonTitle>
+          <IonTitle>
+            <img src="/logo.png" alt="HoboDraft" style={{ height: 32, verticalAlign: 'middle' }} />
+          </IonTitle>
           <IonButtons slot="end">
             {user?.role === 'admin' && (
               <IonButton onClick={() => history.push('/admin')}>
@@ -135,7 +139,7 @@ export default function Dashboard() {
                   <div className="script-meta">
                     <span className="script-type-label">{TYPE_LABELS[s.type] || s.type}</span>
                     <div className="script-dates">
-                      <span>Edited {formatDate(s.updated_at)}</span>
+                      <span>Edited {formatDate(s.updatedAt)}</span>
                     </div>
                   </div>
                   <button className="delete-btn" onClick={(e) => deleteScript(s.id, e)}>
