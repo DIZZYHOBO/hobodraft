@@ -7,6 +7,7 @@ import {
 import { statsChart, download, helpCircle, checkmarkCircle, warning, construct, locate, sparkles, arrowBack } from 'ionicons/icons';
 import { useParams, useHistory } from 'react-router-dom';
 import { api } from '../App';
+import { ClapperboardIcon, QuillIcon, BookOpenIcon, LightbulbIcon } from '../components/Icons';
 
 interface ScriptElement {
   id: string;
@@ -55,9 +56,17 @@ const NEXT_TYPE: Record<string, string> = {
   'body': 'body', 'thought': 'body', 'scene-break': 'body', 'letter': 'body', 'section-header': 'body'
 };
 
-const HELP_CONTENT: Record<string, { title: string; intro: string; elements: { name: string; label: string; description: string; example: string }[] }> = {
+interface HelpContentType {
+  title: string;
+  icon: React.ReactNode;
+  intro: string;
+  elements: { name: string; label: string; description: string; example: string }[];
+}
+
+const HELP_CONTENT: Record<string, HelpContentType> = {
   screenplay: {
-    title: '🎬 Screenplay Guide',
+    title: 'Screenplay Guide',
+    icon: <ClapperboardIcon size={24} />,
     intro: 'Screenplays follow a specific format. Each page roughly equals one minute of screen time.',
     elements: [
       { name: 'scene-heading', label: 'Scene Heading', description: 'WHERE and WHEN. Starts with INT./EXT., location, and time.', example: 'INT. COFFEE SHOP - DAY' },
@@ -69,7 +78,8 @@ const HELP_CONTENT: Record<string, { title: string; intro: string; elements: { n
     ]
   },
   poetry: {
-    title: '📝 Poetry Guide',
+    title: 'Poetry Guide',
+    icon: <QuillIcon size={24} />,
     intro: 'Poetry expresses emotions through carefully chosen words and rhythm.',
     elements: [
       { name: 'poem-title', label: 'Title', description: 'Name of your poem. Centered at top.', example: 'The Road Not Taken' },
@@ -82,7 +92,8 @@ const HELP_CONTENT: Record<string, { title: string; intro: string; elements: { n
     ]
   },
   fiction: {
-    title: '📖 Fiction Guide',
+    title: 'Fiction Guide',
+    icon: <BookOpenIcon size={24} />,
     intro: 'Fiction tells stories through prose, balancing action, dialogue, and internal experience.',
     elements: [
       { name: 'chapter-heading', label: 'Chapter', description: 'New chapter start.', example: 'CHAPTER ONE' },
@@ -767,7 +778,19 @@ export default function Editor() {
 
       {/* Help Modal */}
       <IonModal isOpen={showHelp} onDidDismiss={() => setShowHelp(false)}>
-        <IonHeader><IonToolbar><IonTitle>{helpContent.title}</IonTitle><IonButtons slot="end"><IonButton onClick={() => setShowHelp(false)}>Close</IonButton></IonButtons></IonToolbar></IonHeader>
+        <IonHeader>
+          <IonToolbar>
+            <IonTitle>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {helpContent.icon}
+                <span>{helpContent.title}</span>
+              </div>
+            </IonTitle>
+            <IonButtons slot="end">
+              <IonButton onClick={() => setShowHelp(false)}>Close</IonButton>
+            </IonButtons>
+          </IonToolbar>
+        </IonHeader>
         <IonContent className="ion-padding">
           <div className="help-content">
             <p className="help-intro">{helpContent.intro}</p>
@@ -781,7 +804,10 @@ export default function Editor() {
               ))}
             </div>
             <div className="help-tips">
-              <h3>💡 Quick Tips</h3>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <LightbulbIcon size={20} color="#f59e0b" />
+                <span>Quick Tips</span>
+              </h3>
               <ul>
                 <li><strong>Enter</strong> — Create new line</li>
                 <li><strong>Tab</strong> — Cycle through element types</li>

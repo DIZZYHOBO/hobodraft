@@ -7,6 +7,13 @@ import {
 import { add, logOut, trash, settings } from 'ionicons/icons';
 import { useHistory } from 'react-router-dom';
 import { api, useAuth } from '../App';
+import { 
+  getTypeIcon, 
+  ClapperboardIcon, 
+  QuillIcon, 
+  BookOpenIcon, 
+  PenNibIcon 
+} from '../components/Icons';
 
 interface Script {
   id: string;
@@ -16,20 +23,15 @@ interface Script {
   updated_at: string;
 }
 
-const TYPE_ICONS: Record<string, string> = {
-  'feature': '🎬', 'short': '🎞️', 'tv-pilot': '📺', 'tv-episode': '📺',
-  'poetry': '📝', 'poem': '📝', 'fiction': '📖', 'novel': '📖', 'short-story': '📖'
-};
-
 const TYPE_LABELS: Record<string, string> = {
   'feature': 'Feature Film', 'short': 'Short Film', 'tv-pilot': 'TV Pilot', 'tv-episode': 'TV Episode',
   'poetry': 'Poetry', 'poem': 'Poetry', 'fiction': 'Fiction', 'novel': 'Novel', 'short-story': 'Short Story'
 };
 
 const CATEGORIES = {
-  screenplay: { label: '🎬 Screenplay', types: ['feature', 'short', 'tv-pilot', 'tv-episode'] },
-  poetry: { label: '📝 Poetry', types: ['poetry'] },
-  fiction: { label: '📖 Fiction', types: ['fiction', 'novel', 'short-story'] }
+  screenplay: { label: 'Screenplay', types: ['feature', 'short', 'tv-pilot', 'tv-episode'] },
+  poetry: { label: 'Poetry', types: ['poetry'] },
+  fiction: { label: 'Fiction', types: ['fiction', 'novel', 'short-story'] }
 };
 
 export default function Dashboard() {
@@ -83,12 +85,6 @@ export default function Dashboard() {
     history.push('/auth');
   };
 
-  const getCategory = (type: string): 'screenplay' | 'poetry' | 'fiction' => {
-    if (CATEGORIES.poetry.types.includes(type)) return 'poetry';
-    if (CATEGORIES.fiction.types.includes(type)) return 'fiction';
-    return 'screenplay';
-  };
-
   const formatDate = (d: string) => {
     const date = new Date(d);
     const now = new Date();
@@ -121,7 +117,9 @@ export default function Dashboard() {
       <IonContent className="ion-padding">
         {scripts.length === 0 ? (
           <div style={{ textAlign: 'center', paddingTop: 60 }}>
-            <p style={{ fontSize: 48, marginBottom: 16 }}>✍️</p>
+            <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'center' }}>
+              <PenNibIcon size={48} color="#6366f1" />
+            </div>
             <h2>No scripts yet</h2>
             <p style={{ color: '#888' }}>Tap + to create your first script</p>
           </div>
@@ -130,7 +128,7 @@ export default function Dashboard() {
             {scripts.map(s => (
               <div key={s.id} className="script-card" onClick={() => history.push('/editor/' + s.id)}>
                 <div className="script-card-top">
-                  <span className="script-type-icon">{TYPE_ICONS[s.type] || '📄'}</span>
+                  <span className="script-type-icon">{getTypeIcon(s.type, 32, '#1a1a1e')}</span>
                   <h3>{s.title}</h3>
                 </div>
                 <div className="script-card-bottom">
@@ -169,15 +167,15 @@ export default function Dashboard() {
               <h3>Category</h3>
               <IonSegment value={category} onIonChange={e => setCategory(e.detail.value as any)}>
                 <IonSegmentButton value="screenplay">
-                  <div className="segment-icon">🎬</div>
+                  <div className="segment-icon"><ClapperboardIcon size={24} /></div>
                   <IonLabel>Screenplay</IonLabel>
                 </IonSegmentButton>
                 <IonSegmentButton value="poetry">
-                  <div className="segment-icon">📝</div>
+                  <div className="segment-icon"><QuillIcon size={24} /></div>
                   <IonLabel>Poetry</IonLabel>
                 </IonSegmentButton>
                 <IonSegmentButton value="fiction">
-                  <div className="segment-icon">📖</div>
+                  <div className="segment-icon"><BookOpenIcon size={24} /></div>
                   <IonLabel>Fiction</IonLabel>
                 </IonSegmentButton>
               </IonSegment>

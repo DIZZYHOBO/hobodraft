@@ -5,6 +5,7 @@ import {
 } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
 import { api, useAuth } from '../App';
+import { LogoIcon } from '../components/Icons';
 
 export default function Auth() {
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -47,7 +48,10 @@ export default function Auth() {
       </IonHeader>
       <IonContent className="ion-padding">
         <div style={{ maxWidth: 400, margin: '0 auto', paddingTop: 40 }}>
-          <h1 style={{ textAlign: 'center', marginBottom: 24 }}>✍️ HoboDraft</h1>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 24 }}>
+            <LogoIcon size={64} />
+            <h1 style={{ textAlign: 'center', marginTop: 16, marginBottom: 0 }}>HoboDraft</h1>
+          </div>
           <p style={{ textAlign: 'center', color: '#888', marginBottom: 32 }}>
             Professional screenwriting for everyone
           </p>

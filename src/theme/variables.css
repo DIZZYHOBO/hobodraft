@@ -66,7 +66,11 @@
   gap: 12px;
 }
 
-.script-type-icon { font-size: 32px; }
+.script-type-icon { 
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 
 .script-card-top h3 {
   color: #1a1a1e;
@@ -108,7 +112,12 @@
 
 .category-selector { margin: 24px 0; }
 .category-selector h3 { font-size: 14px; color: #a1a1a6; margin-bottom: 12px; text-align: center; }
-.segment-icon { font-size: 24px; margin-bottom: 4px; }
+.segment-icon { 
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px; 
+}
 
 /* ============================================
    EDITOR - Common Styles
@@ -358,7 +367,6 @@
   .scripts-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
   .script-card { height: 240px; }
   .script-card-top h3 { font-size: 14px; }
-  .script-type-icon { font-size: 24px; }
   .help-element { padding: 12px; }
   .help-element-header { flex-direction: column; align-items: flex-start; gap: 8px; }
   .checker-issue { padding: 12px; }
