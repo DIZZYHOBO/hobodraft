@@ -1,0 +1,13 @@
+{
+  "name": "HoboDraft",
+  "short_name": "HoboDraft",
+  "description": "Professional Screenwriting Application",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d0d0f",
+  "theme_color": "#6366f1",
+  "orientation": "any",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
