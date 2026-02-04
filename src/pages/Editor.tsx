@@ -54,7 +54,6 @@ function countLineSyllables(line: string): number {
 export default function Editor() {
   const { id } = useParams<{ id: string }>();
   
-  // All hooks at top level - never conditionally
   const [script, setScript] = useState<any>(null);
   const [elements, setElements] = useState<ScriptElement[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -75,27 +74,51 @@ export default function Editor() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<{ id: string; index: number }[]>([]);
   const [searchIndex, setSearchIndex] = useState(0);
-  const [showAutocomplete, setShowAutocomplete] = useState(false);
-  const [autocompleteItems, setAutocompleteItems] = useState<string[]>([]);
-  const [autocompleteIndex, setAutocompleteIndex] = useState(0);
   const [commentText, setCommentText] = useState('');
   const [commentColor, setCommentColor] = useState('yellow');
   const [versionName, setVersionName] = useState('');
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [wordCount, setWordCount] = useState(0);
+  const [syllableCounts, setSyllableCounts] = useState<Record<string, number>>({});
   
   const paperRef = useRef<HTMLDivElement>(null);
-  const toolbarRef = useRef<HTMLDivElement>(null);
   const saveTimerRef = useRef<number | null>(null);
 
-  // Derived values - not hooks
   const category = getCategory(script?.type);
   const { types: TYPES, labels: TYPE_LABELS, next: NEXT_TYPE } = getTypeConfig(category);
+
+  // Read all content from DOM
+  const getContentFromDOM = useCallback(() => {
+    if (!paperRef.current) return elements;
+    return elements.map(el => {
+      const div = paperRef.current?.querySelector(`[data-id="${el.id}"]`) as HTMLElement;
+      return { ...el, content: div?.textContent || el.content };
+    });
+  }, [elements]);
+
+  // Update word count from DOM
+  const updateWordCount = useCallback(() => {
+    if (!paperRef.current) return;
+    let total = 0;
+    const syllables: Record<string, number> = {};
+    elements.forEach(el => {
+      const div = paperRef.current?.querySelector(`[data-id="${el.id}"]`) as HTMLElement;
+      const text = div?.textContent || '';
+      total += text.split(/\s+/).filter(w => w).length;
+      if (category === 'poetry' && (el.type === 'line' || el.type === 'couplet')) {
+        syllables[el.id] = countLineSyllables(text);
+      }
+    });
+    setWordCount(total);
+    setSyllableCounts(syllables);
+  }, [elements, category]);
 
   const loadScript = useCallback(async () => {
     const res = await api<any>('/scripts/' + id);
     if (res.script) {
       setScript(res.script);
-      setElements(res.content?.elements || []);
+      const els = res.content?.elements || [];
+      setElements(els);
       setTitlePage(res.content?.titlePage || {});
       setCharacters(res.characters || []);
       setLocations(res.locations || []);
@@ -104,25 +127,25 @@ export default function Editor() {
       setAnalysis(res.analysis || {});
       setShareToken(res.script.shareToken);
       setShareMode(res.script.shareMode);
-      if (res.content?.elements?.length > 0) {
-        setActiveId(res.content.elements[0].id);
-        setActiveType(res.content.elements[0].type);
+      if (els.length > 0) {
+        setActiveId(els[0].id);
+        setActiveType(els[0].type);
       }
+      // Set initial word count
+      const total = els.reduce((sum: number, el: ScriptElement) => sum + (el.content?.split(/\s+/).filter((w: string) => w).length || 0), 0);
+      setWordCount(total);
     }
   }, [id]);
 
   useEffect(() => {
     loadScript();
-    
     const handleResize = () => {
       if (window.visualViewport) {
         const diff = window.innerHeight - window.visualViewport.height;
         setKeyboardHeight(diff > 50 ? diff : 0);
       }
     };
-    
     window.visualViewport?.addEventListener('resize', handleResize);
-    
     return () => {
       window.visualViewport?.removeEventListener('resize', handleResize);
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
@@ -134,7 +157,7 @@ export default function Editor() {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); saveNow(); }
       if ((e.ctrlKey || e.metaKey) && e.key === 'f') { e.preventDefault(); setModal('search'); }
       if ((e.ctrlKey || e.metaKey) && e.key === 'e') { e.preventDefault(); setFocusMode(f => !f); }
-      if (e.key === 'Escape') { setShowAutocomplete(false); setFocusMode(false); setModal(null); }
+      if (e.key === 'Escape') { setFocusMode(false); setModal(null); }
     };
     window.addEventListener('keydown', handleKeyboard);
     return () => window.removeEventListener('keydown', handleKeyboard);
@@ -144,7 +167,8 @@ export default function Editor() {
 
   const saveContent = useCallback(async () => {
     setSaving(true);
-    const content = { elements, titlePage };
+    const currentElements = getContentFromDOM();
+    const content = { elements: currentElements, titlePage };
     const res = await api<{ characters: string[]; locations: string[] }>('/scripts/' + id + '/content', {
       method: 'PUT', body: { content } as any
     });
@@ -153,15 +177,16 @@ export default function Editor() {
     setSaving(false);
     setDirty(false);
     setLastSaved(new Date());
-    const words = elements.reduce((sum, el) => sum + (el.content?.split(/\s+/).filter(w => w).length || 0), 0);
+    const words = currentElements.reduce((sum, el) => sum + (el.content?.split(/\s+/).filter(w => w).length || 0), 0);
     await api('/stats', { method: 'POST', body: { wordsToday: words } as any });
-  }, [elements, titlePage, id]);
+  }, [getContentFromDOM, titlePage, id]);
 
   const markDirty = useCallback(() => {
     setDirty(true);
+    updateWordCount();
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = window.setTimeout(() => saveContent(), 2000);
-  }, [saveContent]);
+    saveTimerRef.current = window.setTimeout(() => saveContent(), 3000);
+  }, [saveContent, updateWordCount]);
 
   const saveNow = useCallback(async () => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
@@ -174,80 +199,76 @@ export default function Editor() {
     markDirty();
   };
 
-  const handleInput = (elId: string, val: string) => {
-    setElements(prev => prev.map(el => el.id === elId ? { ...el, content: val } : el));
-    markDirty();
-    const el = elements.find(e => e.id === elId);
-    if (el?.type === 'character' && val.length > 0) {
-      const matches = characters.filter(c => c.toLowerCase().startsWith(val.toLowerCase()) && c.toLowerCase() !== val.toLowerCase());
-      setAutocompleteItems(matches);
-      setShowAutocomplete(matches.length > 0);
-      setAutocompleteIndex(0);
-    } else if (el?.type === 'scene-heading' && val.length > 4) {
-      const matches = locations.filter(l => val.toUpperCase().includes(l.slice(0, 3)));
-      setAutocompleteItems(matches.map(l => `INT. ${l} - DAY`));
-      setShowAutocomplete(matches.length > 0);
-      setAutocompleteIndex(0);
-    } else {
-      setShowAutocomplete(false);
-    }
-  };
-
-  const acceptAutocomplete = (item: string) => {
-    if (!activeId) return;
-    setElements(prev => prev.map(el => el.id === activeId ? { ...el, content: item } : el));
-    setShowAutocomplete(false);
-    markDirty();
-  };
-
   const isMobile = () => window.innerWidth <= 768 || ('ontouchstart' in window);
 
-  const handleKeyDown = (e: React.KeyboardEvent, el: ScriptElement, index: number) => {
-    if (showAutocomplete) {
-      if (e.key === 'ArrowDown') { e.preventDefault(); setAutocompleteIndex(i => Math.min(i + 1, autocompleteItems.length - 1)); return; }
-      if (e.key === 'ArrowUp') { e.preventDefault(); setAutocompleteIndex(i => Math.max(i - 1, 0)); return; }
-      if (e.key === 'Tab' || e.key === 'Enter') { e.preventDefault(); acceptAutocomplete(autocompleteItems[autocompleteIndex]); return; }
-      if (e.key === 'Escape') { setShowAutocomplete(false); return; }
-    }
+  const handleKeyDown = (e: React.KeyboardEvent, elId: string, elType: string, index: number) => {
+    const target = e.target as HTMLElement;
+    const content = target.textContent || '';
+    
     if (e.key === 'Enter') {
       const shouldCreateNew = isMobile() ? e.shiftKey : !e.shiftKey;
       if (shouldCreateNew) {
         e.preventDefault();
-        const newEl: ScriptElement = { id: genId(), type: NEXT_TYPE[el.type] || TYPES[0], content: '' };
-        const newEls = [...elements];
-        newEls.splice(index + 1, 0, newEl);
-        setElements(newEls);
-        setActiveId(newEl.id);
-        setActiveType(newEl.type);
+        // Save current content to state before adding new element
+        setElements(prev => {
+          const updated = prev.map(el => {
+            if (el.id === elId) {
+              const div = paperRef.current?.querySelector(`[data-id="${el.id}"]`) as HTMLElement;
+              return { ...el, content: div?.textContent || el.content };
+            }
+            return el;
+          });
+          const newEl: ScriptElement = { id: genId(), type: NEXT_TYPE[elType] || TYPES[0], content: '' };
+          const newEls = [...updated];
+          newEls.splice(index + 1, 0, newEl);
+          
+          setTimeout(() => {
+            const div = paperRef.current?.querySelector(`[data-id="${newEl.id}"]`) as HTMLElement;
+            div?.focus();
+          }, 50);
+          
+          setActiveId(newEl.id);
+          setActiveType(newEl.type);
+          return newEls;
+        });
         markDirty();
-        setTimeout(() => {
-          const div = paperRef.current?.querySelector(`[data-id="${newEl.id}"]`) as HTMLElement;
-          div?.focus();
-        }, 10);
       }
     }
     if (e.key === 'Tab') {
       e.preventDefault();
-      const curIdx = TYPES.indexOf(el.type);
+      const curIdx = TYPES.indexOf(elType);
       const newIdx = e.shiftKey ? (curIdx - 1 + TYPES.length) % TYPES.length : (curIdx + 1) % TYPES.length;
-      changeType(el.id, TYPES[newIdx]);
+      changeType(elId, TYPES[newIdx]);
     }
-    if (e.key === 'Backspace' && el.content === '' && elements.length > 1) {
+    if (e.key === 'Backspace' && content === '' && elements.length > 1) {
       e.preventDefault();
-      const newEls = elements.filter(x => x.id !== el.id);
-      setElements(newEls);
-      const prevIdx = Math.max(0, index - 1);
-      setActiveId(newEls[prevIdx].id);
-      setActiveType(newEls[prevIdx].type);
+      setElements(prev => {
+        const newEls = prev.filter(x => x.id !== elId);
+        const prevIdx = Math.max(0, index - 1);
+        setTimeout(() => {
+          const div = paperRef.current?.querySelector(`[data-id="${newEls[prevIdx].id}"]`) as HTMLElement;
+          div?.focus();
+          // Move cursor to end
+          if (div) {
+            const range = document.createRange();
+            const sel = window.getSelection();
+            range.selectNodeContents(div);
+            range.collapse(false);
+            sel?.removeAllRanges();
+            sel?.addRange(range);
+          }
+        }, 50);
+        setActiveId(newEls[prevIdx].id);
+        setActiveType(newEls[prevIdx].type);
+        return newEls;
+      });
       markDirty();
-      setTimeout(() => {
-        const div = paperRef.current?.querySelector(`[data-id="${newEls[prevIdx].id}"]`) as HTMLElement;
-        div?.focus();
-      }, 10);
     }
   };
 
   const handleFocus = (el: ScriptElement) => { setActiveId(el.id); setActiveType(el.type); };
+
+  const handleInput = () => { markDirty(); };
 
   const handleToolbarTap = (type: string, e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault();
@@ -258,17 +279,27 @@ export default function Editor() {
     if (!activeId) return;
     const idx = elements.findIndex(el => el.id === activeId);
     if (idx === -1) return;
-    const newEl: ScriptElement = { id: genId(), type: NEXT_TYPE[elements[idx].type] || TYPES[0], content: '' };
-    const newEls = [...elements];
-    newEls.splice(idx + 1, 0, newEl);
-    setElements(newEls);
-    setActiveId(newEl.id);
-    setActiveType(newEl.type);
+    
+    // Save all current content from DOM
+    setElements(prev => {
+      const updated = prev.map(el => {
+        const div = paperRef.current?.querySelector(`[data-id="${el.id}"]`) as HTMLElement;
+        return { ...el, content: div?.textContent || el.content };
+      });
+      const newEl: ScriptElement = { id: genId(), type: NEXT_TYPE[updated[idx].type] || TYPES[0], content: '' };
+      const newEls = [...updated];
+      newEls.splice(idx + 1, 0, newEl);
+      
+      setTimeout(() => {
+        const div = paperRef.current?.querySelector(`[data-id="${newEl.id}"]`) as HTMLElement;
+        div?.focus();
+      }, 50);
+      
+      setActiveId(newEl.id);
+      setActiveType(newEl.type);
+      return newEls;
+    });
     markDirty();
-    setTimeout(() => {
-      const div = paperRef.current?.querySelector(`[data-id="${newEl.id}"]`) as HTMLElement;
-      div?.focus();
-    }, 10);
   };
 
   const doSearch = (query: string) => {
@@ -276,7 +307,9 @@ export default function Editor() {
     if (query.length < 2) { setSearchResults([]); return; }
     const results: { id: string; index: number }[] = [];
     elements.forEach((el, i) => {
-      if (el.content.toLowerCase().includes(query.toLowerCase())) results.push({ id: el.id, index: i });
+      const div = paperRef.current?.querySelector(`[data-id="${el.id}"]`) as HTMLElement;
+      const content = div?.textContent || el.content;
+      if (content.toLowerCase().includes(query.toLowerCase())) results.push({ id: el.id, index: i });
     });
     setSearchResults(results);
     setSearchIndex(0);
@@ -314,6 +347,9 @@ export default function Editor() {
 
   const createVersion = async () => {
     const name = versionName.trim() || `Version ${versions.length + 1}`;
+    // Save current content first
+    const currentElements = getContentFromDOM();
+    await api('/scripts/' + id + '/content', { method: 'PUT', body: { content: { elements: currentElements, titlePage } } as any });
     const res = await api<{ version: Version }>('/scripts/' + id + '/versions', { method: 'POST', body: { name } as any });
     if (res.version) setVersions(prev => [...prev, res.version]);
     setVersionName('');
@@ -323,7 +359,11 @@ export default function Editor() {
     if (!confirm('Restore this version?')) return;
     await createVersion();
     const res = await api<{ content: any }>('/scripts/' + id + '/versions/' + vid, { method: 'POST' });
-    if (res.content) { setElements(res.content.elements || []); setTitlePage(res.content.titlePage || {}); setDirty(false); }
+    if (res.content) { 
+      setElements(res.content.elements || []); 
+      setTitlePage(res.content.titlePage || {}); 
+      setDirty(false); 
+    }
   };
 
   const deleteVersion = async (vid: string) => {
@@ -355,11 +395,12 @@ export default function Editor() {
   };
 
   const exportFountain = () => {
+    const currentElements = getContentFromDOM();
     let out = '';
     if (titlePage.title) out += `Title: ${titlePage.title}\n`;
     if (titlePage.writtenBy) out += `Credit: Written by\nAuthor: ${titlePage.writtenBy}\n`;
     out += '\n';
-    for (const el of elements) {
+    for (const el of currentElements) {
       switch (el.type) {
         case 'scene-heading': out += `\n${el.content.toUpperCase()}\n\n`; break;
         case 'action': out += `${el.content}\n\n`; break;
@@ -374,9 +415,10 @@ export default function Editor() {
   };
 
   const exportMarkdown = () => {
+    const currentElements = getContentFromDOM();
     let out = `# ${titlePage.title || script?.title || 'Untitled'}\n\n`;
     if (titlePage.writtenBy) out += `*by ${titlePage.writtenBy}*\n\n---\n\n`;
-    for (const el of elements) {
+    for (const el of currentElements) {
       switch (el.type) {
         case 'scene-heading': out += `## ${el.content}\n\n`; break;
         case 'character': out += `**${el.content.toUpperCase()}**\n\n`; break;
@@ -390,8 +432,9 @@ export default function Editor() {
   };
 
   const exportPlainText = () => {
+    const currentElements = getContentFromDOM();
     let out = `${titlePage.title || script?.title || 'Untitled'}\n${'='.repeat(40)}\n\n`;
-    for (const el of elements) {
+    for (const el of currentElements) {
       if (el.type === 'scene-heading') out += `\n---\n${el.content.toUpperCase()}\n---\n\n`;
       else if (el.type === 'character') out += `\n        ${el.content.toUpperCase()}\n`;
       else if (el.type === 'dialogue') out += `    ${el.content}\n`;
@@ -423,10 +466,8 @@ export default function Editor() {
     setModal(null);
   };
 
-  const wordCount = elements.reduce((sum, el) => sum + (el.content?.split(/\s+/).filter(w => w).length || 0), 0);
   const pageCount = Math.ceil(wordCount / 250);
 
-  // Loading state
   if (!script) {
     return (
       <IonPage>
@@ -478,29 +519,30 @@ export default function Editor() {
                   className={`element ${el.type} ${el.id === activeId ? 'active' : ''}`}
                   contentEditable
                   suppressContentEditableWarning
-                  dir="ltr"
                   data-id={el.id}
                   data-placeholder={TYPE_LABELS[el.type] || el.type}
                   onFocus={() => handleFocus(el)}
-                  onInput={e => handleInput(el.id, (e.target as HTMLElement).textContent || '')}
-                  onKeyDown={e => handleKeyDown(e, el, i)}
-                  dangerouslySetInnerHTML={{ __html: el.content }}
+                  onInput={handleInput}
+                  onKeyDown={e => handleKeyDown(e, el.id, el.type, i)}
+                  ref={node => {
+                    // Set initial content only once
+                    if (node && node.textContent === '' && el.content) {
+                      node.textContent = el.content;
+                    }
+                  }}
                 />
-                {category === 'poetry' && (el.type === 'line' || el.type === 'couplet') && <span className="syllable-count">{countLineSyllables(el.content)} syl</span>}
-                {comments.some(c => c.elementId === el.id && !c.resolved) && <span className="comment-indicator" style={{ background: comments.find(c => c.elementId === el.id)?.color || 'yellow' }} />}
+                {category === 'poetry' && (el.type === 'line' || el.type === 'couplet') && (
+                  <span className="syllable-count">{syllableCounts[el.id] || countLineSyllables(el.content)} syl</span>
+                )}
+                {comments.some(c => c.elementId === el.id && !c.resolved) && (
+                  <span className="comment-indicator" style={{ background: comments.find(c => c.elementId === el.id)?.color || 'yellow' }} />
+                )}
               </div>
             ))}
           </div>
-          {showAutocomplete && autocompleteItems.length > 0 && (
-            <div className="autocomplete-dropdown">
-              {autocompleteItems.slice(0, 5).map((item, i) => (
-                <div key={item} className={`autocomplete-item ${i === autocompleteIndex ? 'active' : ''}`} onMouseDown={() => acceptAutocomplete(item)}>{item}</div>
-              ))}
-            </div>
-          )}
         </div>
 
-        <div ref={toolbarRef} className="editor-toolbar-container" style={{ bottom: keyboardHeight > 0 ? `${keyboardHeight}px` : '0' }}>
+        <div className="editor-toolbar-container" style={{ bottom: keyboardHeight > 0 ? `${keyboardHeight}px` : '0' }}>
           <div className="toolbar-buttons">
             {TYPES.map(type => (
               <button key={type} className={'toolbar-btn' + (activeType === type ? ' active' : '')} onTouchEnd={e => handleToolbarTap(type, e)} onClick={e => handleToolbarTap(type, e)}>{TYPE_LABELS[type] || type}</button>
@@ -522,7 +564,7 @@ export default function Editor() {
                 <div className="help-section">
                   <h3>Quick Tips</h3>
                   <ul>
-                    <li><strong>Mobile:</strong> Enter = new line, tap + = new element</li>
+                    <li><strong>Mobile:</strong> Enter = new line, Shift+Enter or tap + = new element</li>
                     <li><strong>Desktop:</strong> Enter = new element, Shift+Enter = new line</li>
                     <li><strong>Tab</strong> - Cycle through element types</li>
                     <li><strong>Ctrl/Cmd+S</strong> - Save immediately</li>
