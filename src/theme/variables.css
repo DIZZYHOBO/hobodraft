@@ -1365,6 +1365,120 @@ body[data-theme="midnight"] { --ion-background-color: #1a1a2e; --ion-text-color:
   color: #f5f5f7;
 }
 
+/* Native Form Elements */
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 6px;
+  color: #a1a1a6;
+  font-size: 13px;
+}
+
+.form-input,
+.form-select,
+.form-textarea {
+  width: 100%;
+  padding: 12px 14px;
+  background: #242428;
+  border: 1px solid #333;
+  border-radius: 8px;
+  color: #f5f5f7;
+  font-size: 15px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.form-input:focus,
+.form-select:focus,
+.form-textarea:focus {
+  border-color: #6366f1;
+}
+
+.form-select {
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23a1a1a6' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
+}
+
+.form-textarea {
+  resize: vertical;
+  min-height: 80px;
+  font-family: inherit;
+}
+
+.btn-primary {
+  width: 100%;
+  padding: 14px;
+  background: #6366f1;
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-primary:hover {
+  background: #5558e3;
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  width: 100%;
+  padding: 12px;
+  background: transparent;
+  border: 1px solid #6366f1;
+  border-radius: 8px;
+  color: #6366f1;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.btn-secondary:hover {
+  background: rgba(99, 102, 241, 0.1);
+}
+
+.btn-danger {
+  width: 100%;
+  padding: 14px;
+  background: #ef4444;
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-danger:hover {
+  background: #dc2626;
+}
+
+.btn-small {
+  padding: 6px 12px;
+  background: #242428;
+  border: 1px solid #333;
+  border-radius: 6px;
+  color: #f5f5f7;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.btn-small:hover {
+  background: #333;
+}
+
 /* Help section styling */
 .help-section {
   margin-bottom: 24px;

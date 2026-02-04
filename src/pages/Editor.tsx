@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonButton, IonIcon,
-  IonItem, IonInput, IonTextarea
+  IonPage, IonHeader, IonToolbar, IonContent, IonButtons, IonButton, IonIcon
 } from '@ionic/react';
 import {
   arrowBack, download, help, list, eye, eyeOff, chatbubble, share, time,
@@ -69,6 +68,7 @@ export default function Editor() {
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   
   const paperRef = useRef<HTMLDivElement>(null);
+  const toolbarRef = useRef<HTMLDivElement>(null);
   const saveTimer = useRef<number | null>(null);
 
   const getCategory = () => {
@@ -481,7 +481,7 @@ export default function Editor() {
           )}
         </div>
 
-        <div ref={useRef<HTMLDivElement>(null)} className="editor-toolbar-container" style={{ bottom: keyboardHeight > 0 ? `${keyboardHeight}px` : '0' }}>
+        <div ref={toolbarRef} className="editor-toolbar-container" style={{ bottom: keyboardHeight > 0 ? `${keyboardHeight}px` : '0' }}>
           <div className="toolbar-buttons">
             {TYPES.map(type => (
               <button key={type} className={'toolbar-btn' + (activeType === type ? ' active' : '')} onTouchEnd={e => handleToolbarTap(type, e)} onClick={e => handleToolbarTap(type, e)}>{TYPE_LABELS[type]}</button>
@@ -511,22 +511,22 @@ export default function Editor() {
                     <li><strong>Ctrl/Cmd+E</strong> — Toggle focus mode</li>
                     <li><strong>Backspace</strong> on empty line — Delete element</li>
                   </ul>
-                  <IonButton expand="block" fill="outline" onClick={() => setModal('titlepage')}>Edit Title Page</IonButton>
+                  <button className="btn-secondary" onClick={() => setModal('titlepage')}>Edit Title Page</button>
                 </div>
               )}
               {modal === 'titlepage' && (
                 <>
-                  <IonItem><IonInput label="Title" labelPlacement="stacked" value={titlePage.title || ''} onIonInput={e => updateTitlePage('title', e.detail.value || '')} /></IonItem>
-                  <IonItem><IonInput label="Written By" labelPlacement="stacked" value={titlePage.writtenBy || ''} onIonInput={e => updateTitlePage('writtenBy', e.detail.value || '')} /></IonItem>
-                  <IonItem><IonTextarea label="Contact" labelPlacement="stacked" value={titlePage.contact || ''} onIonInput={e => updateTitlePage('contact', e.detail.value || '')} rows={3} /></IonItem>
-                  <IonItem><IonInput label="Draft" labelPlacement="stacked" value={titlePage.draft || ''} onIonInput={e => updateTitlePage('draft', e.detail.value || '')} /></IonItem>
+                  <div className="form-group"><label>Title</label><input type="text" className="form-input" value={titlePage.title || ''} onChange={e => updateTitlePage('title', e.target.value)} /></div>
+                  <div className="form-group"><label>Written By</label><input type="text" className="form-input" value={titlePage.writtenBy || ''} onChange={e => updateTitlePage('writtenBy', e.target.value)} /></div>
+                  <div className="form-group"><label>Contact</label><textarea className="form-textarea" value={titlePage.contact || ''} onChange={e => updateTitlePage('contact', e.target.value)} rows={3} /></div>
+                  <div className="form-group"><label>Draft</label><input type="text" className="form-input" value={titlePage.draft || ''} onChange={e => updateTitlePage('draft', e.target.value)} /></div>
                 </>
               )}
               {modal === 'export' && (
                 <div className="export-options">
-                  {category === 'screenplay' && <button className="export-btn" onClick={() => { exportFountain(); setModal(null); }}><span className="export-icon">⛲</span><div><strong>Fountain</strong><p>Industry standard format</p></div></button>}
-                  <button className="export-btn" onClick={() => { exportMarkdown(); setModal(null); }}><span className="export-icon">📝</span><div><strong>Markdown</strong><p>For blogs, GitHub</p></div></button>
-                  <button className="export-btn" onClick={() => { exportPlainText(); setModal(null); }}><span className="export-icon">📃</span><div><strong>Plain Text</strong><p>Simple text file</p></div></button>
+                  {category === 'screenplay' && <button className="export-btn" onClick={() => { exportFountain(); setModal(null); }}><span className="export-icon">F</span><div><strong>Fountain</strong><p>Industry standard format</p></div></button>}
+                  <button className="export-btn" onClick={() => { exportMarkdown(); setModal(null); }}><span className="export-icon">M</span><div><strong>Markdown</strong><p>For blogs, GitHub</p></div></button>
+                  <button className="export-btn" onClick={() => { exportPlainText(); setModal(null); }}><span className="export-icon">T</span><div><strong>Plain Text</strong><p>Simple text file</p></div></button>
                 </div>
               )}
               {modal === 'outline' && (
@@ -543,12 +543,12 @@ export default function Editor() {
               )}
               {modal === 'search' && (
                 <>
-                  <IonItem><IonInput label="Search" labelPlacement="stacked" value={searchQuery} onIonInput={e => doSearch(e.detail.value || '')} placeholder="Type to search..." /></IonItem>
+                  <div className="form-group"><label>Search</label><input type="text" className="form-input" value={searchQuery} onChange={e => doSearch(e.target.value)} placeholder="Type to search..." autoFocus /></div>
                   {searchResults.length > 0 && (
                     <div className="search-nav">
                       <span>{searchIndex + 1} of {searchResults.length}</span>
-                      <IonButton fill="clear" size="small" onClick={() => jumpToSearchResult((searchIndex - 1 + searchResults.length) % searchResults.length)}>Prev</IonButton>
-                      <IonButton fill="clear" size="small" onClick={() => jumpToSearchResult((searchIndex + 1) % searchResults.length)}>Next</IonButton>
+                      <button className="btn-small" onClick={() => jumpToSearchResult((searchIndex - 1 + searchResults.length) % searchResults.length)}>Prev</button>
+                      <button className="btn-small" onClick={() => jumpToSearchResult((searchIndex + 1) % searchResults.length)}>Next</button>
                     </div>
                   )}
                   {searchQuery.length >= 2 && searchResults.length === 0 && <p style={{ textAlign: 'center', color: '#888' }}>No matches</p>}
@@ -558,13 +558,13 @@ export default function Editor() {
                 <>
                   <div className="comment-add">
                     <h4>Add comment to current element</h4>
-                    <IonTextarea value={commentText} onIonInput={e => setCommentText(e.detail.value || '')} placeholder="Type your note..." rows={2} />
+                    <textarea className="form-textarea" value={commentText} onChange={e => setCommentText(e.target.value)} placeholder="Type your note..." rows={2} />
                     <div className="comment-colors">
                       {['yellow', 'red', 'green', 'blue', 'purple'].map(c => (
                         <button key={c} className={`color-btn ${commentColor === c ? 'active' : ''}`} style={{ background: c }} onClick={() => setCommentColor(c)} />
                       ))}
                     </div>
-                    <IonButton expand="block" onClick={addComment} disabled={!commentText.trim()}>Add Comment</IonButton>
+                    <button className="btn-primary" onClick={addComment} disabled={!commentText.trim()}>Add Comment</button>
                   </div>
                   <h4 style={{ marginTop: 24 }}>All Comments ({comments.length})</h4>
                   {comments.length === 0 ? <p style={{ color: '#888' }}>No comments yet</p> : (
@@ -590,8 +590,8 @@ export default function Editor() {
               {modal === 'versions' && (
                 <>
                   <div className="version-create">
-                    <IonItem><IonInput label="Version name" labelPlacement="stacked" value={versionName} onIonInput={e => setVersionName(e.detail.value || '')} placeholder={`Version ${versions.length + 1}`} /></IonItem>
-                    <IonButton expand="block" onClick={createVersion} style={{ marginTop: 12 }}>Save Current as Version</IonButton>
+                    <div className="form-group"><label>Version name</label><input type="text" className="form-input" value={versionName} onChange={e => setVersionName(e.target.value)} placeholder={`Version ${versions.length + 1}`} /></div>
+                    <button className="btn-primary" onClick={createVersion}>Save Current as Version</button>
                   </div>
                   <h4 style={{ marginTop: 24 }}>Saved Versions ({versions.length})</h4>
                   {versions.length === 0 ? <p style={{ color: '#888' }}>No versions saved</p> : (
@@ -610,8 +610,8 @@ export default function Editor() {
                 shareToken ? (
                   <div className="share-active">
                     <div className="share-status"><IonIcon icon={checkmark} style={{ color: '#22c55e', fontSize: 32 }} /><h3>Sharing is ON</h3><p>Mode: {shareMode === 'edit' ? 'Can Edit' : 'View Only'}</p></div>
-                    <div className="share-link-box"><code>{window.location.origin}/shared/{shareToken}</code><IonButton fill="clear" onClick={copyShareLink}><IonIcon icon={copy} /></IonButton></div>
-                    <IonButton expand="block" color="danger" onClick={disableSharing}>Stop Sharing</IonButton>
+                    <div className="share-link-box"><code>{window.location.origin}/shared/{shareToken}</code><button className="btn-small" onClick={copyShareLink}><IonIcon icon={copy} /></button></div>
+                    <button className="btn-danger" onClick={disableSharing}>Stop Sharing</button>
                   </div>
                 ) : (
                   <div className="share-options">

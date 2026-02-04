@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonButton,
-  IonIcon, IonFab, IonFabButton, IonItem, IonInput,
-  IonSelect, IonSelectOption
+  IonIcon, IonFab, IonFabButton
 } from '@ionic/react';
 import { 
   add, logOut, trash, settings, filterOutline, pencil, folder, 
@@ -66,7 +65,7 @@ export default function Dashboard() {
   const [modal, setModal] = useState<string | null>(null);
   const [newTitle, setNewTitle] = useState('');
   const [newType, setNewType] = useState('feature');
-  const [newFolderId, setNewFolderId] = useState<string | null>(null);
+  const [newFolderId, setNewFolderId] = useState<string>('');
   const [newFolderName, setNewFolderName] = useState('');
   const [category, setCategory] = useState<'screenplay' | 'poetry' | 'fiction'>('screenplay');
   const [filterType, setFilterType] = useState<string>('all');
@@ -99,13 +98,13 @@ export default function Dashboard() {
     if (!newTitle.trim()) return;
     const res = await api<{ script: Script }>('/scripts', {
       method: 'POST',
-      body: { title: newTitle, type: newType, folderId: newFolderId } as any
+      body: { title: newTitle, type: newType, folderId: newFolderId || null } as any
     });
     if (res.script) {
       setScripts(prev => [res.script, ...prev]);
       setModal(null);
       setNewTitle('');
-      setNewFolderId(null);
+      setNewFolderId('');
       window.location.href = '/editor/' + res.script.id;
     }
   };
@@ -289,55 +288,90 @@ export default function Dashboard() {
                 <button className="modal-close" onClick={() => setModal(null)}><IonIcon icon={close} /></button>
               </div>
               <div className="modal-body">
-                {modal === 'new' && (<>
-                  <div className="category-buttons">
-                    <button className={category === 'screenplay' ? 'active' : ''} onClick={() => setCategory('screenplay')}><ClapperboardIcon size={20} /> Screenplay</button>
-                    <button className={category === 'poetry' ? 'active' : ''} onClick={() => setCategory('poetry')}><QuillIcon size={20} /> Poetry</button>
-                    <button className={category === 'fiction' ? 'active' : ''} onClick={() => setCategory('fiction')}><BookOpenIcon size={20} /> Fiction</button>
-                  </div>
-                  <IonItem><IonInput label="Title" labelPlacement="stacked" placeholder="My Awesome Script" value={newTitle} onIonInput={e => setNewTitle(e.detail.value || '')} /></IonItem>
-                  <IonItem><IonSelect label="Format" labelPlacement="stacked" value={newType} onIonChange={e => setNewType(e.detail.value)}>{CATEGORIES[category].types.map(t => <IonSelectOption key={t} value={t}>{TYPE_LABELS[t]}</IonSelectOption>)}</IonSelect></IonItem>
-                  {folders.length > 0 && <IonItem><IonSelect label="Folder" labelPlacement="stacked" value={newFolderId} onIonChange={e => setNewFolderId(e.detail.value)}><IonSelectOption value={null}>No folder</IonSelectOption>{folders.map(f => <IonSelectOption key={f.id} value={f.id}>{f.name}</IonSelectOption>)}</IonSelect></IonItem>}
-                  <IonButton expand="block" onClick={createScript} style={{ marginTop: 24 }}>Create</IonButton>
-                </>)}
-                {modal === 'edit' && (<>
-                  <IonItem><IonInput label="Title" labelPlacement="stacked" value={editTitle} onIonInput={e => setEditTitle(e.detail.value || '')} onKeyDown={e => e.key === 'Enter' && saveEdit()} /></IonItem>
-                  <IonButton expand="block" onClick={saveEdit} style={{ marginTop: 24 }}>Save</IonButton>
-                </>)}
-                {modal === 'newFolder' && (<>
-                  <IonItem><IonInput label="Folder Name" labelPlacement="stacked" value={newFolderName} onIonInput={e => setNewFolderName(e.detail.value || '')} onKeyDown={e => e.key === 'Enter' && createFolder()} /></IonItem>
-                  <IonButton expand="block" onClick={createFolder} style={{ marginTop: 24 }}>Create Folder</IonButton>
-                </>)}
-                {modal === 'search' && (<>
-                  <IonItem><IonInput label="Search" labelPlacement="stacked" value={searchQuery} onIonInput={e => doSearch(e.detail.value || '')} placeholder="Type to search..." /></IonItem>
-                  <div className="search-results">
-                    {searchResults.map(r => (
-                      <div key={r.id} className="search-result" onClick={() => { setModal(null); goToEditor(r.id); }}>
-                        <div className="search-result-header">{getTypeIcon(r.type, 20, '#6366f1')}<strong>{r.title}</strong></div>
-                        {r.matches.slice(0, 3).map((m, i) => <p key={i} className="search-match">...{m.text.slice(0, 100)}...</p>)}
+                {modal === 'new' && (
+                  <>
+                    <div className="category-buttons">
+                      <button className={category === 'screenplay' ? 'active' : ''} onClick={() => setCategory('screenplay')}><ClapperboardIcon size={20} /> Screenplay</button>
+                      <button className={category === 'poetry' ? 'active' : ''} onClick={() => setCategory('poetry')}><QuillIcon size={20} /> Poetry</button>
+                      <button className={category === 'fiction' ? 'active' : ''} onClick={() => setCategory('fiction')}><BookOpenIcon size={20} /> Fiction</button>
+                    </div>
+                    <div className="form-group">
+                      <label>Title</label>
+                      <input type="text" className="form-input" value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="My Awesome Script" autoFocus />
+                    </div>
+                    <div className="form-group">
+                      <label>Format</label>
+                      <select className="form-select" value={newType} onChange={e => setNewType(e.target.value)}>
+                        {CATEGORIES[category].types.map(t => <option key={t} value={t}>{TYPE_LABELS[t]}</option>)}
+                      </select>
+                    </div>
+                    {folders.length > 0 && (
+                      <div className="form-group">
+                        <label>Folder (optional)</label>
+                        <select className="form-select" value={newFolderId} onChange={e => setNewFolderId(e.target.value)}>
+                          <option value="">No folder</option>
+                          {folders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                        </select>
                       </div>
-                    ))}
-                    {searchQuery.length >= 2 && searchResults.length === 0 && <p style={{ textAlign: 'center', color: '#888' }}>No results found</p>}
-                  </div>
-                </>)}
-                {modal === 'stats' && (<>
-                  <div className="stats-grid">
-                    <div className="stats-card"><h2>{scripts.length}</h2><p>Total Scripts</p></div>
-                    <div className="stats-card"><h2>{totalWords.toLocaleString()}</h2><p>Total Words</p></div>
-                    <div className="stats-card"><h2>{stats?.streak || 0}</h2><p>Day Streak</p></div>
-                    <div className="stats-card"><h2>{todayWords.toLocaleString()}</h2><p>Words Today</p></div>
-                  </div>
-                  <h3 style={{ marginTop: 24 }}>Recent Activity</h3>
-                  <div className="activity-chart">
-                    {Array.from({ length: 7 }).map((_, i) => {
-                      const d = new Date(Date.now() - (6 - i) * 86400000).toISOString().split('T')[0];
-                      const words = stats?.dailyWords?.[d] || 0;
-                      const maxWords = Math.max(...Object.values(stats?.dailyWords || { x: 100 }), 100);
-                      const height = Math.max(4, (words / maxWords) * 100);
-                      return (<div key={d} className="activity-bar-container"><div className="activity-bar" style={{ height: `${height}%` }} /><span className="activity-day">{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(d).getDay()]}</span></div>);
-                    })}
-                  </div>
-                </>)}
+                    )}
+                    <button className="btn-primary" onClick={createScript}>Create</button>
+                  </>
+                )}
+                {modal === 'edit' && (
+                  <>
+                    <div className="form-group">
+                      <label>Title</label>
+                      <input type="text" className="form-input" value={editTitle} onChange={e => setEditTitle(e.target.value)} onKeyDown={e => e.key === 'Enter' && saveEdit()} autoFocus />
+                    </div>
+                    <button className="btn-primary" onClick={saveEdit}>Save</button>
+                  </>
+                )}
+                {modal === 'newFolder' && (
+                  <>
+                    <div className="form-group">
+                      <label>Folder Name</label>
+                      <input type="text" className="form-input" value={newFolderName} onChange={e => setNewFolderName(e.target.value)} onKeyDown={e => e.key === 'Enter' && createFolder()} autoFocus />
+                    </div>
+                    <button className="btn-primary" onClick={createFolder}>Create Folder</button>
+                  </>
+                )}
+                {modal === 'search' && (
+                  <>
+                    <div className="form-group">
+                      <label>Search</label>
+                      <input type="text" className="form-input" value={searchQuery} onChange={e => doSearch(e.target.value)} placeholder="Type to search..." autoFocus />
+                    </div>
+                    <div className="search-results">
+                      {searchResults.map(r => (
+                        <div key={r.id} className="search-result" onClick={() => { setModal(null); goToEditor(r.id); }}>
+                          <div className="search-result-header">{getTypeIcon(r.type, 20, '#6366f1')}<strong>{r.title}</strong></div>
+                          {r.matches.slice(0, 3).map((m, i) => <p key={i} className="search-match">...{m.text.slice(0, 100)}...</p>)}
+                        </div>
+                      ))}
+                      {searchQuery.length >= 2 && searchResults.length === 0 && <p style={{ textAlign: 'center', color: '#888' }}>No results found</p>}
+                    </div>
+                  </>
+                )}
+                {modal === 'stats' && (
+                  <>
+                    <div className="stats-grid">
+                      <div className="stats-card"><h2>{scripts.length}</h2><p>Total Scripts</p></div>
+                      <div className="stats-card"><h2>{totalWords.toLocaleString()}</h2><p>Total Words</p></div>
+                      <div className="stats-card"><h2>{stats?.streak || 0}</h2><p>Day Streak</p></div>
+                      <div className="stats-card"><h2>{todayWords.toLocaleString()}</h2><p>Words Today</p></div>
+                    </div>
+                    <h3 style={{ marginTop: 24 }}>Recent Activity</h3>
+                    <div className="activity-chart">
+                      {Array.from({ length: 7 }).map((_, i) => {
+                        const d = new Date(Date.now() - (6 - i) * 86400000).toISOString().split('T')[0];
+                        const words = stats?.dailyWords?.[d] || 0;
+                        const maxWords = Math.max(...Object.values(stats?.dailyWords || { x: 100 }), 100);
+                        const height = Math.max(4, (words / maxWords) * 100);
+                        return (<div key={d} className="activity-bar-container"><div className="activity-bar" style={{ height: `${height}%` }} /><span className="activity-day">{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(d).getDay()]}</span></div>);
+                      })}
+                    </div>
+                  </>
+                )}
                 {modal === 'themes' && (
                   <div className="themes-grid">
                     {THEMES.map(t => <button key={t.id} className="theme-card" onClick={() => changeTheme(t.id)} style={{ background: t.bg, color: t.text }}><span className="theme-name">{t.name}</span><span className="theme-preview">Aa</span></button>)}
