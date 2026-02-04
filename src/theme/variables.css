@@ -555,20 +555,21 @@
   font-family: 'Courier Prime', Courier, monospace;
   font-size: 12pt;
   line-height: 1.5;
-  background: #1e1e22;
-  color: #f5f5f7;
-  padding: 48px;
+  background: #fdfcf9;
+  color: #1a1a1e;
+  padding: 60px 72px;
   width: 100%;
-  max-width: 650px;
-  min-height: 800px;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+  max-width: 8.5in;
+  min-height: 11in;
+  margin: 20px auto;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.3);
   direction: ltr;
   text-align: left;
 }
 
-.el, .element {
+.element {
   padding: 4px 8px;
-  margin-bottom: 8px;
+  margin-bottom: 0;
   outline: none;
   min-height: 1.2em;
   white-space: pre-wrap;
@@ -579,65 +580,201 @@
   unicode-bidi: plaintext;
 }
 
-.el:focus { background: rgba(99,102,241,0.15); }
+.element:focus { background: rgba(99,102,241,0.12); }
+.element:empty::before {
+  content: attr(data-placeholder);
+  color: #999;
+  pointer-events: none;
+}
 
 /* ============================================
-   SCREENPLAY Elements
+   SCREENPLAY Format - Industry Standard
    ============================================ */
 
-.paper-screenplay { line-height: 1.1; }
-.paper-screenplay .el { padding-bottom: 12px; margin-bottom: 0; }
-.el.scene-heading { text-transform: uppercase; font-weight: bold; margin-top: 24px; }
-.el.character { text-transform: uppercase; padding-left: 35%; margin-top: 12px; }
-.el.dialogue { padding-left: 15%; padding-right: 20%; }
-.el.parenthetical { padding-left: 25%; padding-right: 30%; }
-.el.parenthetical::before { content: '('; }
-.el.parenthetical::after { content: ')'; }
-.el.transition { text-transform: uppercase; text-align: right; margin-top: 12px; }
+.paper.screenplay {
+  font-family: 'Courier Prime', 'Courier New', Courier, monospace;
+  font-size: 12pt;
+  line-height: 1;
+  padding: 1in 1in 1in 1.5in;
+}
+
+.paper.screenplay .element {
+  margin-bottom: 12px;
+}
+
+.paper.screenplay .element.scene-heading {
+  text-transform: uppercase;
+  font-weight: bold;
+  margin-top: 24px;
+  margin-bottom: 12px;
+}
+
+.paper.screenplay .element.action {
+  margin-bottom: 12px;
+}
+
+.paper.screenplay .element.character {
+  text-transform: uppercase;
+  margin-left: 2in;
+  margin-top: 12px;
+  margin-bottom: 0;
+}
+
+.paper.screenplay .element.dialogue {
+  margin-left: 1in;
+  margin-right: 1.5in;
+  margin-bottom: 12px;
+}
+
+.paper.screenplay .element.parenthetical {
+  margin-left: 1.5in;
+  margin-right: 2in;
+  margin-bottom: 0;
+}
+.paper.screenplay .element.parenthetical::before { content: '('; }
+.paper.screenplay .element.parenthetical::after { content: ')'; }
+
+.paper.screenplay .element.transition {
+  text-transform: uppercase;
+  text-align: right;
+  margin-top: 12px;
+  margin-bottom: 12px;
+}
 
 /* ============================================
-   POETRY Elements
+   POETRY Format - Elegant centered verse
    ============================================ */
 
-.paper-poetry {
+.paper.poetry {
   font-family: Georgia, 'Times New Roman', serif;
   font-size: 14pt;
-  line-height: 1.6;
-  padding: 60px 80px;
+  line-height: 1.8;
+  padding: 72px 60px;
+  text-align: center;
+  background: #fffef9;
 }
 
-.el.poem-title { font-size: 20pt; font-weight: bold; text-align: center; margin-bottom: 24px; }
-.el.dedication { font-style: italic; text-align: center; color: #a1a1a6; margin-bottom: 32px; }
-.el.verse-indent { padding-left: 40px; }
-.el.stanza-break { min-height: 24px; background: transparent !important; }
-.el.stanza-break::before { content: '⁂'; display: block; text-align: center; color: #4a4a4e; font-size: 10pt; }
-.el.refrain { font-style: italic; color: #a1a1a6; }
-.el.attribution { text-align: right; margin-top: 24px; font-style: italic; }
-.el.attribution::before { content: '— '; }
+.paper.poetry .element {
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+.paper.poetry .element.poem-title {
+  font-size: 24pt;
+  font-weight: bold;
+  margin-bottom: 32px;
+  letter-spacing: 1px;
+}
+
+.paper.poetry .element.stanza {
+  font-style: italic;
+  color: #666;
+  margin-top: 24px;
+  margin-bottom: 16px;
+  font-size: 11pt;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.paper.poetry .element.line {
+  margin-bottom: 8px;
+}
+
+.paper.poetry .element.couplet {
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.paper.poetry .element.attribution {
+  text-align: right;
+  margin-top: 32px;
+  font-style: italic;
+  color: #666;
+}
+.paper.poetry .element.attribution::before { content: '— '; }
+
+/* Syllable counter for poetry */
+.syllable-count {
+  position: absolute;
+  right: -50px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  color: #999;
+  font-family: monospace;
+  background: #f0f0f0;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
 
 /* ============================================
-   FICTION Elements
+   FICTION Format - Novel/prose style
    ============================================ */
 
-.paper-fiction {
+.paper.fiction {
   font-family: Georgia, 'Times New Roman', serif;
   font-size: 12pt;
-  line-height: 2;
-  padding: 48px;
+  line-height: 1.8;
+  padding: 60px 72px;
+  text-align: justify;
+  background: #fffef8;
 }
 
-.el.chapter-heading { font-size: 18pt; font-weight: bold; text-align: center; margin-top: 48px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 2px; }
-.el.chapter-subtitle { font-size: 12pt; font-style: italic; text-align: center; color: #a1a1a6; margin-bottom: 32px; }
-.el.body { text-indent: 1.5em; }
-.el.body:first-of-type, .el.chapter-heading + .el.body, .el.chapter-subtitle + .el.body, .el.scene-break + .el.body { text-indent: 0; }
-.paper-fiction .el.dialogue { text-indent: 1.5em; padding-left: 0; padding-right: 0; }
-.paper-fiction .el.dialogue::before { content: '"'; }
-.paper-fiction .el.dialogue::after { content: '"'; }
-.el.thought { font-style: italic; text-indent: 1.5em; }
-.el.scene-break { text-align: center; margin: 24px 0; min-height: 24px; }
-.el.scene-break::before { content: '#'; color: #6a6a6e; }
-.el.letter { font-family: 'Courier Prime', Courier, monospace; font-size: 11pt; background: rgba(255,255,255,0.03); padding: 16px 24px; margin: 16px 32px; border-left: 3px solid #4a4a4e; }
-.el.section-header { font-size: 14pt; font-weight: bold; text-align: center; margin-top: 64px; margin-bottom: 32px; text-transform: uppercase; letter-spacing: 4px; border-top: 1px solid #4a4a4e; border-bottom: 1px solid #4a4a4e; padding: 16px 0; }
+.paper.fiction .element {
+  text-indent: 0;
+  margin-bottom: 0;
+}
+
+.paper.fiction .element.chapter-heading {
+  font-size: 20pt;
+  font-weight: bold;
+  text-align: center;
+  text-indent: 0;
+  margin-top: 72px;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+}
+
+.paper.fiction .element.chapter-heading:first-child {
+  margin-top: 0;
+}
+
+.paper.fiction .element.paragraph {
+  text-indent: 1.5em;
+  margin-bottom: 0;
+  text-align: justify;
+}
+
+.paper.fiction .element.paragraph:first-child,
+.paper.fiction .element.chapter-heading + .element.paragraph {
+  text-indent: 0;
+}
+
+.paper.fiction .element.dialogue-fiction {
+  text-indent: 1.5em;
+  margin-bottom: 0;
+}
+
+.paper.fiction .element.break {
+  text-align: center;
+  margin: 32px 0;
+  text-indent: 0;
+  color: #666;
+}
+.paper.fiction .element.break::before { content: '* * *'; letter-spacing: 8px; }
+
+.paper.fiction .element.epigraph {
+  font-style: italic;
+  text-align: center;
+  text-indent: 0;
+  margin: 32px 48px;
+  color: #555;
+  border-left: 3px solid #ccc;
+  padding-left: 16px;
+  text-align: left;
+}
 
 /* ============================================
    TOOLBAR - Floating above keyboard
@@ -804,26 +941,70 @@
    MOBILE RESPONSIVE
    ============================================ */
 
-@media (max-width: 576px) {
-  .editor-wrapper { padding: 16px; padding-bottom: 80px; }
-  .paper { padding: 24px; min-height: auto; }
-  .paper-poetry { padding: 24px; }
-  .paper-fiction { padding: 24px; }
-  .el.character { padding-left: 20%; }
-  .el.dialogue { padding-left: 5%; padding-right: 5%; }
-  .el.parenthetical { padding-left: 10%; padding-right: 10%; }
-  .el.letter { margin: 16px 8px; padding: 12px 16px; }
-  .toolbar-btn { padding: 14px 4px; font-size: 10px; min-width: 40px; }
-  .scripts-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
-  .script-card { height: 240px; }
-  .script-card-top h3 { font-size: 14px; }
-  .help-element { padding: 12px; }
-  .help-element-header { flex-direction: column; align-items: flex-start; gap: 8px; }
-  .checker-issue { padding: 12px; }
-  .issue-actions { flex-direction: column; }
-  .issue-actions ion-button { width: 100%; }
+@media (max-width: 768px) {
+  .editor-wrapper { 
+    padding: 8px; 
+    padding-bottom: 80px; 
+  }
   
-  /* Editor header mobile adjustments */
+  .paper {
+    padding: 24px 16px;
+    min-height: auto;
+    max-width: 100%;
+    margin: 0;
+    box-shadow: none;
+  }
+  
+  .paper.screenplay {
+    padding: 24px 16px;
+  }
+  
+  .paper.screenplay .element.character {
+    margin-left: 20%;
+  }
+  
+  .paper.screenplay .element.dialogue {
+    margin-left: 8%;
+    margin-right: 8%;
+  }
+  
+  .paper.screenplay .element.parenthetical {
+    margin-left: 12%;
+    margin-right: 12%;
+  }
+  
+  .paper.poetry {
+    padding: 24px 16px;
+  }
+  
+  .paper.fiction {
+    padding: 24px 16px;
+  }
+  
+  .toolbar-btn { 
+    padding: 14px 4px; 
+    font-size: 10px; 
+    min-width: 40px; 
+  }
+  
+  .scripts-grid { 
+    grid-template-columns: repeat(2, 1fr); 
+    gap: 12px; 
+  }
+  
+  .script-card { 
+    height: 240px; 
+  }
+  
+  .script-card-top h3 { 
+    font-size: 14px; 
+  }
+  
+  .syllable-count {
+    right: 4px;
+    font-size: 9px;
+  }
+  
   .editor-title-input {
     font-size: 14px;
     max-width: 140px;
@@ -843,16 +1024,48 @@
   @page { size: letter; margin: 1in; }
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   body, ion-app, .editor-wrapper { background: white !important; }
-  .paper { background: white !important; color: black !important; padding: 0 !important; max-width: none !important; box-shadow: none !important; width: 100% !important; }
-  .el { color: black !important; background: none !important; }
-  .el:focus { background: none !important; }
-  .paper-screenplay .el.scene-heading { page-break-after: avoid; }
-  .paper-screenplay .el.character { page-break-after: avoid; }
-  .paper-poetry { padding: 0 !important; }
-  .paper-fiction .el.chapter-heading { page-break-before: always; }
-  .paper-fiction .el.chapter-heading:first-child { page-break-before: avoid; }
-  .el.scene-break { page-break-after: avoid; }
-  ion-header, ion-footer, ion-tab-bar, ion-fab, ion-toolbar, .toolbar-buttons, IonBackButton { display: none !important; }
+  
+  .paper, .paper.screenplay, .paper.poetry, .paper.fiction { 
+    background: white !important; 
+    color: black !important; 
+    padding: 0 !important; 
+    max-width: none !important; 
+    box-shadow: none !important; 
+    width: 100% !important; 
+  }
+  
+  .element { 
+    color: black !important; 
+    background: none !important; 
+  }
+  
+  .element:focus { 
+    background: none !important; 
+  }
+  
+  .paper.screenplay .element.scene-heading { 
+    page-break-after: avoid; 
+  }
+  
+  .paper.screenplay .element.character { 
+    page-break-after: avoid; 
+  }
+  
+  .paper.fiction .element.chapter-heading { 
+    page-break-before: always; 
+  }
+  
+  .paper.fiction .element.chapter-heading:first-child { 
+    page-break-before: avoid; 
+  }
+  
+  .element.break { 
+    page-break-after: avoid; 
+  }
+  
+  ion-header, ion-footer, ion-tab-bar, ion-fab, ion-toolbar, .toolbar-buttons, .editor-toolbar-container, .syllable-count { 
+    display: none !important; 
+  }
 }
 
 /* ============================================
@@ -1097,8 +1310,23 @@ body[data-theme="midnight"] { --ion-background-color: #1a1a2e; --ion-text-color:
 .comment-actions button { background: #242428; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; color: #a1a1a6; cursor: pointer; }
 .comment-actions button:hover { background: #333; color: #f5f5f7; }
 
-.element-wrapper { position: relative; }
-.element-wrapper.has-comment { background: rgba(255, 255, 0, 0.05); }
+.element-wrapper { 
+  position: relative; 
+  margin-bottom: 0;
+}
+.element-wrapper.has-comment { 
+  background: rgba(255, 235, 59, 0.08); 
+  border-radius: 4px;
+}
+.comment-indicator {
+  position: absolute;
+  left: -8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 70%;
+  border-radius: 2px;
+}
 .comment-indicator { position: absolute; right: -20px; top: 50%; transform: translateY(-50%); width: 12px; height: 12px; border-radius: 50%; }
 .syllable-count { position: absolute; right: -50px; top: 50%; transform: translateY(-50%); font-size: 10px; color: #6a6a6e; }
 
