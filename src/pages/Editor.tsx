@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  IonPage, IonHeader, IonToolbar, IonContent, IonButtons, IonButton, IonIcon,
-  IonModal, IonItem, IonInput, IonLabel, IonTextarea, IonSelect, IonSelectOption
+  IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonButton, IonIcon,
+  IonModal, IonItem, IonInput, IonLabel, IonTextarea, IonSelect, IonSelectOption, IonSearchbar
 } from '@ionic/react';
 import {
   arrowBack, download, help, list, eye, eyeOff, chatbubble, share, time,
-  search, document, checkmark, close, copy, trash, colorPalette, contract, expand, pencil
+  search, checkmark, close, copy, trash, pencil
 } from 'ionicons/icons';
 import { useParams } from 'react-router-dom';
 import { api } from '../App';
