@@ -25,6 +25,20 @@ const FICTION_TYPES = ['chapter-heading', 'paragraph', 'dialogue-fiction', 'brea
 const FICTION_LABELS: Record<string, string> = { 'chapter-heading': 'Chapter', 'paragraph': 'Para', 'dialogue-fiction': 'Dialog', 'break': 'Break', 'epigraph': 'Epigraph' };
 const FICTION_NEXT: Record<string, string> = { 'chapter-heading': 'paragraph', 'paragraph': 'paragraph', 'dialogue-fiction': 'paragraph', 'break': 'paragraph', 'epigraph': 'paragraph' };
 
+function getCategory(type: string | undefined): 'screenplay' | 'poetry' | 'fiction' {
+  if (!type) return 'screenplay';
+  const t = type.toLowerCase();
+  if (t === 'poetry' || t === 'poem') return 'poetry';
+  if (['fiction', 'novel', 'short-story'].includes(t)) return 'fiction';
+  return 'screenplay';
+}
+
+function getTypeConfig(category: 'screenplay' | 'poetry' | 'fiction') {
+  if (category === 'poetry') return { types: POETRY_TYPES, labels: POETRY_LABELS, next: POETRY_NEXT };
+  if (category === 'fiction') return { types: FICTION_TYPES, labels: FICTION_LABELS, next: FICTION_NEXT };
+  return { types: SCREENPLAY_TYPES, labels: SCREENPLAY_LABELS, next: SCREENPLAY_NEXT };
+}
+
 function countSyllables(word: string): number {
   word = word.toLowerCase().replace(/[^a-z]/g, '');
   if (word.length <= 3) return 1;
@@ -39,6 +53,8 @@ function countLineSyllables(line: string): number {
 
 export default function Editor() {
   const { id } = useParams<{ id: string }>();
+  
+  // All hooks at top level - never conditionally
   const [script, setScript] = useState<any>(null);
   const [elements, setElements] = useState<ScriptElement[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -69,45 +85,13 @@ export default function Editor() {
   
   const paperRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
-  const saveTimer = useRef<number | null>(null);
+  const saveTimerRef = useRef<number | null>(null);
 
-  const getCategory = () => {
-    if (!script?.type) return 'screenplay';
-    const t = script.type.toLowerCase();
-    if (t === 'poetry' || t === 'poem') return 'poetry';
-    if (['fiction', 'novel', 'short-story'].includes(t)) return 'fiction';
-    return 'screenplay';
-  };
+  // Derived values - not hooks
+  const category = getCategory(script?.type);
+  const { types: TYPES, labels: TYPE_LABELS, next: NEXT_TYPE } = getTypeConfig(category);
 
-  const category = getCategory();
-  const TYPES = category === 'poetry' ? POETRY_TYPES : category === 'fiction' ? FICTION_TYPES : SCREENPLAY_TYPES;
-  const TYPE_LABELS = category === 'poetry' ? POETRY_LABELS : category === 'fiction' ? FICTION_LABELS : SCREENPLAY_LABELS;
-  const NEXT_TYPE = category === 'poetry' ? POETRY_NEXT : category === 'fiction' ? FICTION_NEXT : SCREENPLAY_NEXT;
-
-  useEffect(() => {
-    loadScript();
-    const handleResize = () => {
-      if (window.visualViewport) {
-        const diff = window.innerHeight - window.visualViewport.height;
-        setKeyboardHeight(diff > 50 ? diff : 0);
-      }
-    };
-    window.visualViewport?.addEventListener('resize', handleResize);
-    const handleKeyboard = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); saveNow(); }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'f') { e.preventDefault(); setModal('search'); }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'e') { e.preventDefault(); setFocusMode(f => !f); }
-      if (e.key === 'Escape') { setShowAutocomplete(false); setFocusMode(false); setModal(null); }
-    };
-    window.addEventListener('keydown', handleKeyboard);
-    return () => {
-      window.visualViewport?.removeEventListener('resize', handleResize);
-      window.removeEventListener('keydown', handleKeyboard);
-      if (saveTimer.current) clearTimeout(saveTimer.current);
-    };
-  }, []);
-
-  const loadScript = async () => {
+  const loadScript = useCallback(async () => {
     const res = await api<any>('/scripts/' + id);
     if (res.script) {
       setScript(res.script);
@@ -125,18 +109,40 @@ export default function Editor() {
         setActiveType(res.content.elements[0].type);
       }
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    loadScript();
+    
+    const handleResize = () => {
+      if (window.visualViewport) {
+        const diff = window.innerHeight - window.visualViewport.height;
+        setKeyboardHeight(diff > 50 ? diff : 0);
+      }
+    };
+    
+    window.visualViewport?.addEventListener('resize', handleResize);
+    
+    return () => {
+      window.visualViewport?.removeEventListener('resize', handleResize);
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+  }, [loadScript]);
+
+  useEffect(() => {
+    const handleKeyboard = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); saveNow(); }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') { e.preventDefault(); setModal('search'); }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'e') { e.preventDefault(); setFocusMode(f => !f); }
+      if (e.key === 'Escape') { setShowAutocomplete(false); setFocusMode(false); setModal(null); }
+    };
+    window.addEventListener('keydown', handleKeyboard);
+    return () => window.removeEventListener('keydown', handleKeyboard);
+  }, []);
 
   const genId = () => crypto.randomUUID();
 
-  const markDirty = useCallback(() => {
-    setDirty(true);
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = window.setTimeout(() => saveContent(), 2000);
-  }, []);
-
-  const saveContent = async () => {
-    if (!dirty) return;
+  const saveContent = useCallback(async () => {
     setSaving(true);
     const content = { elements, titlePage };
     const res = await api<{ characters: string[]; locations: string[] }>('/scripts/' + id + '/content', {
@@ -149,13 +155,18 @@ export default function Editor() {
     setLastSaved(new Date());
     const words = elements.reduce((sum, el) => sum + (el.content?.split(/\s+/).filter(w => w).length || 0), 0);
     await api('/stats', { method: 'POST', body: { wordsToday: words } as any });
-  };
+  }, [elements, titlePage, id]);
 
-  const saveNow = async () => {
-    if (saveTimer.current) clearTimeout(saveTimer.current);
+  const markDirty = useCallback(() => {
     setDirty(true);
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = window.setTimeout(() => saveContent(), 2000);
+  }, [saveContent]);
+
+  const saveNow = useCallback(async () => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     await saveContent();
-  };
+  }, [saveContent]);
 
   const changeType = (elId: string, newType: string) => {
     setElements(prev => prev.map(el => el.id === elId ? { ...el, type: newType } : el));
@@ -381,7 +392,7 @@ export default function Editor() {
   const exportPlainText = () => {
     let out = `${titlePage.title || script?.title || 'Untitled'}\n${'='.repeat(40)}\n\n`;
     for (const el of elements) {
-      if (el.type === 'scene-heading') out += `\n${'—'.repeat(20)}\n${el.content.toUpperCase()}\n${'—'.repeat(20)}\n\n`;
+      if (el.type === 'scene-heading') out += `\n---\n${el.content.toUpperCase()}\n---\n\n`;
       else if (el.type === 'character') out += `\n        ${el.content.toUpperCase()}\n`;
       else if (el.type === 'dialogue') out += `    ${el.content}\n`;
       else out += `${el.content}\n\n`;
@@ -415,8 +426,15 @@ export default function Editor() {
   const wordCount = elements.reduce((sum, el) => sum + (el.content?.split(/\s+/).filter(w => w).length || 0), 0);
   const pageCount = Math.ceil(wordCount / 250);
 
+  // Loading state
   if (!script) {
-    return <IonPage><IonContent className="ion-padding"><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>Loading...</div></IonContent></IonPage>;
+    return (
+      <IonPage>
+        <IonContent className="ion-padding">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>Loading...</div>
+        </IonContent>
+      </IonPage>
+    );
   }
 
   const outlineItems = getOutlineItems();
@@ -460,8 +478,9 @@ export default function Editor() {
                   className={`element ${el.type} ${el.id === activeId ? 'active' : ''}`}
                   contentEditable
                   suppressContentEditableWarning
+                  dir="ltr"
                   data-id={el.id}
-                  data-placeholder={TYPE_LABELS[el.type]}
+                  data-placeholder={TYPE_LABELS[el.type] || el.type}
                   onFocus={() => handleFocus(el)}
                   onInput={e => handleInput(el.id, (e.target as HTMLElement).textContent || '')}
                   onKeyDown={e => handleKeyDown(e, el, i)}
@@ -484,7 +503,7 @@ export default function Editor() {
         <div ref={toolbarRef} className="editor-toolbar-container" style={{ bottom: keyboardHeight > 0 ? `${keyboardHeight}px` : '0' }}>
           <div className="toolbar-buttons">
             {TYPES.map(type => (
-              <button key={type} className={'toolbar-btn' + (activeType === type ? ' active' : '')} onTouchEnd={e => handleToolbarTap(type, e)} onClick={e => handleToolbarTap(type, e)}>{TYPE_LABELS[type]}</button>
+              <button key={type} className={'toolbar-btn' + (activeType === type ? ' active' : '')} onTouchEnd={e => handleToolbarTap(type, e)} onClick={e => handleToolbarTap(type, e)}>{TYPE_LABELS[type] || type}</button>
             ))}
             <button className="toolbar-btn toolbar-btn-new" onTouchEnd={e => { e.preventDefault(); addNewElement(); }} onClick={addNewElement}>+</button>
           </div>
@@ -505,11 +524,11 @@ export default function Editor() {
                   <ul>
                     <li><strong>Mobile:</strong> Enter = new line, tap + = new element</li>
                     <li><strong>Desktop:</strong> Enter = new element, Shift+Enter = new line</li>
-                    <li><strong>Tab</strong> — Cycle through element types</li>
-                    <li><strong>Ctrl/Cmd+S</strong> — Save immediately</li>
-                    <li><strong>Ctrl/Cmd+F</strong> — Search in script</li>
-                    <li><strong>Ctrl/Cmd+E</strong> — Toggle focus mode</li>
-                    <li><strong>Backspace</strong> on empty line — Delete element</li>
+                    <li><strong>Tab</strong> - Cycle through element types</li>
+                    <li><strong>Ctrl/Cmd+S</strong> - Save immediately</li>
+                    <li><strong>Ctrl/Cmd+F</strong> - Search in script</li>
+                    <li><strong>Ctrl/Cmd+E</strong> - Toggle focus mode</li>
+                    <li><strong>Backspace</strong> on empty line - Delete element</li>
                   </ul>
                   <button className="btn-secondary" onClick={() => setModal('titlepage')}>Edit Title Page</button>
                 </div>
