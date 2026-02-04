@@ -1,14 +1,13 @@
 import { useState, useEffect } from 'react';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonButton,
-  IonIcon, IonFab, IonFabButton, IonModal, IonItem, IonInput, IonLabel,
-  IonSelect, IonSelectOption, IonSegment, IonSegmentButton, IonSearchbar
+  IonIcon, IonFab, IonFabButton, IonItem, IonInput,
+  IonSelect, IonSelectOption
 } from '@ionic/react';
 import { 
   add, logOut, trash, settings, filterOutline, pencil, folder, 
-  folderOpen, search, statsChart, flame, documents, colorPalette
+  folderOpen, search, statsChart, flame, documents, colorPalette, close
 } from 'ionicons/icons';
-import { useHistory } from 'react-router-dom';
 import { api, useAuth } from '../App';
 import { 
   getTypeIcon, ClapperboardIcon, QuillIcon, BookOpenIcon, PenNibIcon 
@@ -22,7 +21,6 @@ interface Script {
   createdAt: string;
   updatedAt: string;
   wordCount: number;
-  shareToken?: string;
 }
 
 interface Folder {
@@ -65,11 +63,7 @@ export default function Dashboard() {
   const [scripts, setScripts] = useState<Script[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [stats, setStats] = useState<WritingStats | null>(null);
-  const [showNew, setShowNew] = useState(false);
-  const [showNewFolder, setShowNewFolder] = useState(false);
-  const [showSearch, setShowSearch] = useState(false);
-  const [showStats, setShowStats] = useState(false);
-  const [showThemes, setShowThemes] = useState(false);
+  const [modal, setModal] = useState<string | null>(null);
   const [newTitle, setNewTitle] = useState('');
   const [newType, setNewType] = useState('feature');
   const [newFolderId, setNewFolderId] = useState<string | null>(null);
@@ -81,13 +75,9 @@ export default function Dashboard() {
   const [editTitle, setEditTitle] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
-  const [searching, setSearching] = useState(false);
-  const history = useHistory();
-  const { user, setUser } = useAuth();
+  const { user } = useAuth();
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  useEffect(() => { loadData(); }, []);
 
   useEffect(() => {
     const catTypes = CATEGORIES[category].types;
@@ -113,10 +103,10 @@ export default function Dashboard() {
     });
     if (res.script) {
       setScripts(prev => [res.script, ...prev]);
-      setShowNew(false);
+      setModal(null);
       setNewTitle('');
       setNewFolderId(null);
-      history.push('/editor/' + res.script.id);
+      window.location.href = '/editor/' + res.script.id;
     }
   };
 
@@ -128,14 +118,14 @@ export default function Dashboard() {
     });
     if (res.folder) {
       setFolders(prev => [...prev, res.folder].sort((a, b) => a.name.localeCompare(b.name)));
-      setShowNewFolder(false);
+      setModal(null);
       setNewFolderName('');
     }
   };
 
   const deleteFolder = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm('Delete this folder? Scripts inside will be moved out.')) return;
+    if (!confirm('Delete this folder?')) return;
     setFolders(prev => prev.filter(f => f.id !== id));
     setScripts(prev => prev.map(s => s.folderId === id ? { ...s, folderId: null } : s));
     if (selectedFolder === id) setSelectedFolder(null);
@@ -153,29 +143,28 @@ export default function Dashboard() {
     e.stopPropagation();
     setEditingId(script.id);
     setEditTitle(script.title);
+    setModal('edit');
   };
 
   const saveEdit = async () => {
     if (!editingId || !editTitle.trim()) return;
     setScripts(prev => prev.map(s => s.id === editingId ? { ...s, title: editTitle.trim() } : s));
     await api('/scripts/' + editingId, { method: 'PUT', body: { title: editTitle.trim() } as any });
+    setModal(null);
     setEditingId(null);
-    setEditTitle('');
   };
 
   const doSearch = async (q: string) => {
     setSearchQuery(q);
     if (q.length < 2) { setSearchResults([]); return; }
-    setSearching(true);
     const res = await api<{ results: SearchResult[] }>('/scripts/search?q=' + encodeURIComponent(q));
     setSearchResults(res.results || []);
-    setSearching(false);
   };
 
   const changeTheme = async (themeId: string) => {
     document.body.setAttribute('data-theme', themeId);
     await api('/preferences', { method: 'PUT', body: { theme: themeId } as any });
-    setShowThemes(false);
+    setModal(null);
   };
 
   const logout = async () => {
@@ -183,13 +172,14 @@ export default function Dashboard() {
     window.location.href = '/auth';
   };
 
+  const goToEditor = (id: string) => { window.location.href = '/editor/' + id; };
+
   const formatDate = (d: string) => {
     if (!d) return 'Just now';
     const date = new Date(d);
     if (isNaN(date.getTime())) return 'Just now';
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const diff = Date.now() - date.getTime();
+    const days = Math.floor(diff / 86400000);
     if (days === 0) return 'Today';
     if (days === 1) return 'Yesterday';
     if (days < 7) return `${days} days ago`;
@@ -200,12 +190,8 @@ export default function Dashboard() {
   const todayWords = stats?.dailyWords?.[today] || 0;
 
   let filteredScripts = scripts;
-  if (selectedFolder !== null) {
-    filteredScripts = filteredScripts.filter(s => s.folderId === selectedFolder);
-  }
-  if (filterType !== 'all') {
-    filteredScripts = filteredScripts.filter(s => s.type === filterType);
-  }
+  if (selectedFolder !== null) filteredScripts = filteredScripts.filter(s => s.folderId === selectedFolder);
+  if (filterType !== 'all') filteredScripts = filteredScripts.filter(s => s.type === filterType);
 
   const totalWords = scripts.reduce((sum, s) => sum + (s.wordCount || 0), 0);
 
@@ -213,84 +199,54 @@ export default function Dashboard() {
     <IonPage>
       <IonHeader>
         <IonToolbar>
-          <IonTitle>
-            <img src="/logo.png" alt="HoboDraft" style={{ height: 32, verticalAlign: 'middle' }} />
-          </IonTitle>
+          <IonTitle><img src="/logo.png" alt="HoboDraft" style={{ height: 32, verticalAlign: 'middle' }} /></IonTitle>
           <IonButtons slot="end">
-            <IonButton onClick={() => setShowSearch(true)}><IonIcon icon={search} /></IonButton>
-            <IonButton onClick={() => setShowStats(true)}><IonIcon icon={statsChart} /></IonButton>
-            <IonButton onClick={() => setShowThemes(true)}><IonIcon icon={colorPalette} /></IonButton>
-            {user?.role === 'admin' && <IonButton onClick={() => history.push('/admin')}><IonIcon icon={settings} /></IonButton>}
+            <IonButton onClick={() => setModal('search')}><IonIcon icon={search} /></IonButton>
+            <IonButton onClick={() => setModal('stats')}><IonIcon icon={statsChart} /></IonButton>
+            <IonButton onClick={() => setModal('themes')}><IonIcon icon={colorPalette} /></IonButton>
+            {user?.role === 'admin' && <IonButton onClick={() => window.location.href = '/admin'}><IonIcon icon={settings} /></IonButton>}
             <IonButton onClick={logout}><IonIcon icon={logOut} /></IonButton>
           </IonButtons>
         </IonToolbar>
       </IonHeader>
 
       <IonContent className="ion-padding">
-        {/* Stats Banner */}
         {stats && (
           <div className="stats-banner">
-            <div className="stat-item">
-              <IonIcon icon={documents} />
-              <span>{scripts.length} scripts</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-number">{totalWords.toLocaleString()}</span>
-              <span>total words</span>
-            </div>
-            {stats.streak > 0 && (
-              <div className="stat-item streak">
-                <IonIcon icon={flame} />
-                <span>{stats.streak} day streak</span>
-              </div>
-            )}
-            {todayWords > 0 && (
-              <div className="stat-item today">
-                <span>{todayWords.toLocaleString()} words today</span>
-              </div>
-            )}
+            <div className="stat-item"><IonIcon icon={documents} /><span>{scripts.length} scripts</span></div>
+            <div className="stat-item"><span className="stat-number">{totalWords.toLocaleString()}</span><span>total words</span></div>
+            {stats.streak > 0 && <div className="stat-item streak"><IonIcon icon={flame} /><span>{stats.streak} day streak</span></div>}
+            {todayWords > 0 && <div className="stat-item today"><span>{todayWords.toLocaleString()} words today</span></div>}
           </div>
         )}
 
-        {/* Folders */}
         <div className="folders-bar">
           <button className={`folder-chip ${selectedFolder === null ? 'active' : ''}`} onClick={() => setSelectedFolder(null)}>
             <IonIcon icon={documents} /> All
           </button>
           {folders.map(f => (
             <button key={f.id} className={`folder-chip ${selectedFolder === f.id ? 'active' : ''}`} onClick={() => setSelectedFolder(f.id)}>
-              <IonIcon icon={selectedFolder === f.id ? folderOpen : folder} />
-              {f.name}
+              <IonIcon icon={selectedFolder === f.id ? folderOpen : folder} />{f.name}
               <span className="folder-count">{scripts.filter(s => s.folderId === f.id).length}</span>
               <span className="folder-delete" onClick={(e) => deleteFolder(f.id, e)}>&times;</span>
             </button>
           ))}
-          <button className="folder-chip add-folder" onClick={() => setShowNewFolder(true)}>
-            <IonIcon icon={add} /> New Folder
-          </button>
+          <button className="folder-chip add-folder" onClick={() => setModal('newFolder')}><IonIcon icon={add} /> New Folder</button>
         </div>
 
-        {/* Filter */}
         <div className="dashboard-filter-bar">
           <div className="filter-select-wrapper">
             <IonIcon icon={filterOutline} className="filter-icon" />
             <select className="filter-select" value={filterType} onChange={e => setFilterType(e.target.value)}>
               <option value="all">All Types</option>
-              <optgroup label="Screenplay">
-                {CATEGORIES.screenplay.types.map(t => <option key={t} value={t}>{TYPE_LABELS[t]}</option>)}
-              </optgroup>
-              <optgroup label="Poetry">
-                {CATEGORIES.poetry.types.map(t => <option key={t} value={t}>{TYPE_LABELS[t]}</option>)}
-              </optgroup>
-              <optgroup label="Fiction">
-                {CATEGORIES.fiction.types.map(t => <option key={t} value={t}>{TYPE_LABELS[t]}</option>)}
-              </optgroup>
+              <optgroup label="Screenplay">{CATEGORIES.screenplay.types.map(t => <option key={t} value={t}>{TYPE_LABELS[t]}</option>)}</optgroup>
+              <optgroup label="Poetry">{CATEGORIES.poetry.types.map(t => <option key={t} value={t}>{TYPE_LABELS[t]}</option>)}</optgroup>
+              <optgroup label="Fiction">{CATEGORIES.fiction.types.map(t => <option key={t} value={t}>{TYPE_LABELS[t]}</option>)}</optgroup>
             </select>
           </div>
           <span className="script-count">{filteredScripts.length} {filteredScripts.length === 1 ? 'script' : 'scripts'}</span>
         </div>
 
-        {/* Scripts Grid */}
         {filteredScripts.length === 0 ? (
           <div style={{ textAlign: 'center', paddingTop: 60 }}>
             <PenNibIcon size={48} color="#6366f1" />
@@ -300,7 +256,7 @@ export default function Dashboard() {
         ) : (
           <div className="scripts-grid">
             {filteredScripts.map(s => (
-              <div key={s.id} className="script-card" onClick={() => history.push('/editor/' + s.id)}>
+              <div key={s.id} className="script-card" onClick={() => goToEditor(s.id)}>
                 <div className="script-card-top">
                   <span className="script-type-icon">{getTypeIcon(s.type, 32, '#1a1a1e')}</span>
                   <h3>{s.title}</h3>
@@ -322,126 +278,75 @@ export default function Dashboard() {
         )}
 
         <IonFab vertical="bottom" horizontal="end" slot="fixed">
-          <IonFabButton onClick={() => setShowNew(true)}><IonIcon icon={add} /></IonFabButton>
+          <IonFabButton onClick={() => setModal('new')}><IonIcon icon={add} /></IonFabButton>
         </IonFab>
 
-        {/* Search Modal */}
-        <IonModal isOpen={showSearch} onDidDismiss={() => { setShowSearch(false); setSearchQuery(''); setSearchResults([]); }}>
-          <IonHeader><IonToolbar><IonTitle>Search Scripts</IonTitle><IonButtons slot="end"><IonButton onClick={() => setShowSearch(false)}>Close</IonButton></IonButtons></IonToolbar></IonHeader>
-          <IonContent className="ion-padding">
-            <IonSearchbar value={searchQuery} onIonInput={e => doSearch(e.detail.value || '')} placeholder="Search all scripts..." debounce={300} />
-            {searching && <p style={{ textAlign: 'center', color: '#888' }}>Searching...</p>}
-            <div className="search-results">
-              {searchResults.map(r => (
-                <div key={r.id} className="search-result" onClick={() => { setShowSearch(false); history.push('/editor/' + r.id); }}>
-                  <div className="search-result-header">
-                    {getTypeIcon(r.type, 20, '#6366f1')}
-                    <strong>{r.title}</strong>
+        {modal && (
+          <div className="modal-overlay" onClick={() => setModal(null)}>
+            <div className="modal-content" onClick={e => e.stopPropagation()}>
+              <div className="modal-header">
+                <h2>{modal === 'new' ? 'New Script' : modal === 'edit' ? 'Rename Script' : modal === 'newFolder' ? 'New Folder' : modal === 'search' ? 'Search Scripts' : modal === 'stats' ? 'Writing Stats' : 'Choose Theme'}</h2>
+                <button className="modal-close" onClick={() => setModal(null)}><IonIcon icon={close} /></button>
+              </div>
+              <div className="modal-body">
+                {modal === 'new' && (<>
+                  <div className="category-buttons">
+                    <button className={category === 'screenplay' ? 'active' : ''} onClick={() => setCategory('screenplay')}><ClapperboardIcon size={20} /> Screenplay</button>
+                    <button className={category === 'poetry' ? 'active' : ''} onClick={() => setCategory('poetry')}><QuillIcon size={20} /> Poetry</button>
+                    <button className={category === 'fiction' ? 'active' : ''} onClick={() => setCategory('fiction')}><BookOpenIcon size={20} /> Fiction</button>
                   </div>
-                  {r.matches.slice(0, 3).map((m, i) => (
-                    <p key={i} className="search-match">...{m.text.slice(0, 100)}...</p>
-                  ))}
-                </div>
-              ))}
-              {searchQuery.length >= 2 && searchResults.length === 0 && !searching && (
-                <p style={{ textAlign: 'center', color: '#888' }}>No results found</p>
-              )}
-            </div>
-          </IonContent>
-        </IonModal>
-
-        {/* Stats Modal */}
-        <IonModal isOpen={showStats} onDidDismiss={() => setShowStats(false)}>
-          <IonHeader><IonToolbar><IonTitle>Writing Stats</IonTitle><IonButtons slot="end"><IonButton onClick={() => setShowStats(false)}>Close</IonButton></IonButtons></IonToolbar></IonHeader>
-          <IonContent className="ion-padding">
-            <div className="stats-grid">
-              <div className="stats-card"><h2>{scripts.length}</h2><p>Total Scripts</p></div>
-              <div className="stats-card"><h2>{totalWords.toLocaleString()}</h2><p>Total Words</p></div>
-              <div className="stats-card"><h2>{stats?.streak || 0}</h2><p>Day Streak</p></div>
-              <div className="stats-card"><h2>{todayWords.toLocaleString()}</h2><p>Words Today</p></div>
-            </div>
-            <h3 style={{ marginTop: 24 }}>Recent Activity</h3>
-            <div className="activity-chart">
-              {Array.from({ length: 7 }).map((_, i) => {
-                const d = new Date(Date.now() - (6 - i) * 86400000).toISOString().split('T')[0];
-                const words = stats?.dailyWords?.[d] || 0;
-                const maxWords = Math.max(...Object.values(stats?.dailyWords || { x: 100 }), 100);
-                const height = Math.max(4, (words / maxWords) * 100);
-                return (
-                  <div key={d} className="activity-bar-container">
-                    <div className="activity-bar" style={{ height: `${height}%` }} title={`${words} words`} />
-                    <span className="activity-day">{['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date(d).getDay()]}</span>
+                  <IonItem><IonInput label="Title" labelPlacement="stacked" placeholder="My Awesome Script" value={newTitle} onIonInput={e => setNewTitle(e.detail.value || '')} /></IonItem>
+                  <IonItem><IonSelect label="Format" labelPlacement="stacked" value={newType} onIonChange={e => setNewType(e.detail.value)}>{CATEGORIES[category].types.map(t => <IonSelectOption key={t} value={t}>{TYPE_LABELS[t]}</IonSelectOption>)}</IonSelect></IonItem>
+                  {folders.length > 0 && <IonItem><IonSelect label="Folder" labelPlacement="stacked" value={newFolderId} onIonChange={e => setNewFolderId(e.detail.value)}><IonSelectOption value={null}>No folder</IonSelectOption>{folders.map(f => <IonSelectOption key={f.id} value={f.id}>{f.name}</IonSelectOption>)}</IonSelect></IonItem>}
+                  <IonButton expand="block" onClick={createScript} style={{ marginTop: 24 }}>Create</IonButton>
+                </>)}
+                {modal === 'edit' && (<>
+                  <IonItem><IonInput label="Title" labelPlacement="stacked" value={editTitle} onIonInput={e => setEditTitle(e.detail.value || '')} onKeyDown={e => e.key === 'Enter' && saveEdit()} /></IonItem>
+                  <IonButton expand="block" onClick={saveEdit} style={{ marginTop: 24 }}>Save</IonButton>
+                </>)}
+                {modal === 'newFolder' && (<>
+                  <IonItem><IonInput label="Folder Name" labelPlacement="stacked" value={newFolderName} onIonInput={e => setNewFolderName(e.detail.value || '')} onKeyDown={e => e.key === 'Enter' && createFolder()} /></IonItem>
+                  <IonButton expand="block" onClick={createFolder} style={{ marginTop: 24 }}>Create Folder</IonButton>
+                </>)}
+                {modal === 'search' && (<>
+                  <IonItem><IonInput label="Search" labelPlacement="stacked" value={searchQuery} onIonInput={e => doSearch(e.detail.value || '')} placeholder="Type to search..." /></IonItem>
+                  <div className="search-results">
+                    {searchResults.map(r => (
+                      <div key={r.id} className="search-result" onClick={() => { setModal(null); goToEditor(r.id); }}>
+                        <div className="search-result-header">{getTypeIcon(r.type, 20, '#6366f1')}<strong>{r.title}</strong></div>
+                        {r.matches.slice(0, 3).map((m, i) => <p key={i} className="search-match">...{m.text.slice(0, 100)}...</p>)}
+                      </div>
+                    ))}
+                    {searchQuery.length >= 2 && searchResults.length === 0 && <p style={{ textAlign: 'center', color: '#888' }}>No results found</p>}
                   </div>
-                );
-              })}
-            </div>
-          </IonContent>
-        </IonModal>
-
-        {/* Themes Modal */}
-        <IonModal isOpen={showThemes} onDidDismiss={() => setShowThemes(false)}>
-          <IonHeader><IonToolbar><IonTitle>Choose Theme</IonTitle><IonButtons slot="end"><IonButton onClick={() => setShowThemes(false)}>Close</IonButton></IonButtons></IonToolbar></IonHeader>
-          <IonContent className="ion-padding">
-            <div className="themes-grid">
-              {THEMES.map(t => (
-                <button key={t.id} className="theme-card" onClick={() => changeTheme(t.id)} style={{ background: t.bg, color: t.text }}>
-                  <span className="theme-name">{t.name}</span>
-                  <span className="theme-preview">Aa</span>
-                </button>
-              ))}
-            </div>
-          </IonContent>
-        </IonModal>
-
-        {/* Edit Title Modal */}
-        <IonModal isOpen={!!editingId} onDidDismiss={() => setEditingId(null)}>
-          <IonHeader><IonToolbar><IonTitle>Rename Script</IonTitle><IonButtons slot="end"><IonButton onClick={() => setEditingId(null)}>Cancel</IonButton></IonButtons></IonToolbar></IonHeader>
-          <IonContent className="ion-padding">
-            <IonItem><IonInput label="Title" labelPlacement="stacked" value={editTitle} onIonInput={e => setEditTitle(e.detail.value || '')} onKeyDown={e => e.key === 'Enter' && saveEdit()} /></IonItem>
-            <IonButton expand="block" onClick={saveEdit} style={{ marginTop: 24 }}>Save</IonButton>
-          </IonContent>
-        </IonModal>
-
-        {/* New Folder Modal */}
-        <IonModal isOpen={showNewFolder} onDidDismiss={() => setShowNewFolder(false)}>
-          <IonHeader><IonToolbar><IonTitle>New Folder</IonTitle><IonButtons slot="end"><IonButton onClick={() => setShowNewFolder(false)}>Cancel</IonButton></IonButtons></IonToolbar></IonHeader>
-          <IonContent className="ion-padding">
-            <IonItem><IonInput label="Folder Name" labelPlacement="stacked" value={newFolderName} onIonInput={e => setNewFolderName(e.detail.value || '')} onKeyDown={e => e.key === 'Enter' && createFolder()} /></IonItem>
-            <IonButton expand="block" onClick={createFolder} style={{ marginTop: 24 }}>Create Folder</IonButton>
-          </IonContent>
-        </IonModal>
-
-        {/* New Script Modal */}
-        <IonModal isOpen={showNew} onDidDismiss={() => setShowNew(false)}>
-          <IonHeader><IonToolbar><IonTitle>New Script</IonTitle><IonButtons slot="end"><IonButton onClick={() => setShowNew(false)}>Cancel</IonButton></IonButtons></IonToolbar></IonHeader>
-          <IonContent className="ion-padding">
-            <div className="category-selector dark-segment">
-              <h3>Category</h3>
-              <div className="dark-segment-container">
-                <IonSegment value={category} onIonChange={e => setCategory(e.detail.value as any)}>
-                  <IonSegmentButton value="screenplay"><div className="segment-icon"><ClapperboardIcon size={24} /></div><IonLabel>Screenplay</IonLabel></IonSegmentButton>
-                  <IonSegmentButton value="poetry"><div className="segment-icon"><QuillIcon size={24} /></div><IonLabel>Poetry</IonLabel></IonSegmentButton>
-                  <IonSegmentButton value="fiction"><div className="segment-icon"><BookOpenIcon size={24} /></div><IonLabel>Fiction</IonLabel></IonSegmentButton>
-                </IonSegment>
+                </>)}
+                {modal === 'stats' && (<>
+                  <div className="stats-grid">
+                    <div className="stats-card"><h2>{scripts.length}</h2><p>Total Scripts</p></div>
+                    <div className="stats-card"><h2>{totalWords.toLocaleString()}</h2><p>Total Words</p></div>
+                    <div className="stats-card"><h2>{stats?.streak || 0}</h2><p>Day Streak</p></div>
+                    <div className="stats-card"><h2>{todayWords.toLocaleString()}</h2><p>Words Today</p></div>
+                  </div>
+                  <h3 style={{ marginTop: 24 }}>Recent Activity</h3>
+                  <div className="activity-chart">
+                    {Array.from({ length: 7 }).map((_, i) => {
+                      const d = new Date(Date.now() - (6 - i) * 86400000).toISOString().split('T')[0];
+                      const words = stats?.dailyWords?.[d] || 0;
+                      const maxWords = Math.max(...Object.values(stats?.dailyWords || { x: 100 }), 100);
+                      const height = Math.max(4, (words / maxWords) * 100);
+                      return (<div key={d} className="activity-bar-container"><div className="activity-bar" style={{ height: `${height}%` }} /><span className="activity-day">{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(d).getDay()]}</span></div>);
+                    })}
+                  </div>
+                </>)}
+                {modal === 'themes' && (
+                  <div className="themes-grid">
+                    {THEMES.map(t => <button key={t.id} className="theme-card" onClick={() => changeTheme(t.id)} style={{ background: t.bg, color: t.text }}><span className="theme-name">{t.name}</span><span className="theme-preview">Aa</span></button>)}
+                  </div>
+                )}
               </div>
             </div>
-            <IonItem><IonInput label="Title" labelPlacement="stacked" placeholder="My Awesome Script" value={newTitle} onIonInput={e => setNewTitle(e.detail.value || '')} /></IonItem>
-            <IonItem>
-              <IonSelect label="Format" labelPlacement="stacked" value={newType} onIonChange={e => setNewType(e.detail.value)}>
-                {CATEGORIES[category].types.map(t => <IonSelectOption key={t} value={t}>{TYPE_LABELS[t]}</IonSelectOption>)}
-              </IonSelect>
-            </IonItem>
-            {folders.length > 0 && (
-              <IonItem>
-                <IonSelect label="Folder (optional)" labelPlacement="stacked" value={newFolderId} onIonChange={e => setNewFolderId(e.detail.value)} placeholder="No folder">
-                  <IonSelectOption value={null}>No folder</IonSelectOption>
-                  {folders.map(f => <IonSelectOption key={f.id} value={f.id}>{f.name}</IonSelectOption>)}
-                </IonSelect>
-              </IonItem>
-            )}
-            <IonButton expand="block" onClick={createScript} style={{ marginTop: 24 }}>Create</IonButton>
-          </IonContent>
-        </IonModal>
+          </div>
+        )}
       </IonContent>
     </IonPage>
   );

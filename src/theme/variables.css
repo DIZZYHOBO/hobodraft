@@ -1265,6 +1265,106 @@ body[data-theme="midnight"] { --ion-background-color: #1a1a2e; --ion-text-color:
   font-weight: 600;
 }
 
+/* Custom Modal Overlay (replaces IonModal to avoid bugs) */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 20px;
+}
+
+.modal-content {
+  background: #1a1a1e;
+  border-radius: 16px;
+  max-width: 500px;
+  width: 100%;
+  max-height: 80vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-content.modal-large {
+  max-width: 600px;
+  max-height: 85vh;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #333;
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 18px;
+  color: #f5f5f7;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  color: #a1a1a6;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-close:hover {
+  color: #f5f5f7;
+}
+
+.modal-body {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* Category buttons in new script modal */
+.category-buttons {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.category-buttons button {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  background: #242428;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  color: #a1a1a6;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.category-buttons button:hover {
+  border-color: #6366f1;
+}
+
+.category-buttons button.active {
+  background: rgba(99, 102, 241, 0.2);
+  border-color: #6366f1;
+  color: #f5f5f7;
+}
+
 /* Help section styling */
 .help-section {
   margin-bottom: 24px;
